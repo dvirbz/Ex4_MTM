@@ -2,10 +2,13 @@
 #ifndef  COMMUNE_H
 #define COMMUNE_H
 
+#define _WINSOCK_DEPRECATED_NO_WARNINGS
+#include <winsock2.h>
+#pragma comment(lib,"ws2_32.lib")
+
 
 #define SERVER_DENIED "SERVER_DENIED"
 #define SERVER_APPROVED "SERVER_APPROVED"
-
 
 #define CLIENT_REQUEST "CLIENT_REQUEST"
 
@@ -26,8 +29,11 @@ int GET__Server_Denied_PRO(char* protocol);
 int GET__CLIENT_REQUEST_PRO(char* protocol, char* username);
 
 /*Compare*/
-int IS_Denied_or_Approved(char* protocol);
 int GET__Response_ID(char* protocol);
 char* GET__Message_Type(char* protocol);
+int SendBuffer(SOCKET sd, const char* Buffer, int BytesToSend);
+int Send_Socket(SOCKET s, const char* buffer, int len);
+int ReceiveBuffer(SOCKET sd, char* OutputBuffer, int BytesToReceive);
+int Recv_Socket(SOCKET s, char* buffer);
 
 #endif // ! COMMUNE_H

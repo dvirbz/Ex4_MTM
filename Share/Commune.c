@@ -3,6 +3,10 @@
 #include <stdlib.h>
 #include <string.h>
 
+#define _WINSOCK_DEPRECATED_NO_WARNINGS
+#include <winsock2.h>
+#pragma comment(lib,"ws2_32.lib")
+
 int GET__Server_Denied_PRO(char * protocol)
 {
 	if (snprintf(protocol, MAX_PRO_LEN, "%s", SERVER_DENIED) == 0)
@@ -16,49 +20,6 @@ int GET__Server_Approved_PRO(char* protocol)
 	return 0;
 }
 
-int IS_Denied_or_Approved(char* protocol)
-{
-	int exit_code = 0;
-	char* denied = (char*)calloc(MAX_PRO_LEN, 1);
-	if (denied == NULL)
-	{
-		exit_code = -1;
-		goto Exit;
-	}
-	if (GET__Server_Denied_PRO(&denied) == -1)
-	{
-		exit_code = -1;
-		goto Fail;
-	}
-	char* approved = (char*)calloc(MAX_PRO_LEN, 1);
-	if (approved == NULL)
-	{
-		exit_code = -1;
-		goto Fail;
-	}
-	if (GET__Server_Approved_PRO(&approved) == -1)
-	{
-		exit_code = -1;
-		goto FailAfterApproved;
-	}
-	if (strncmp(denied, protocol,sizeof(protocol)) == 0)
-	{
-		exit_code = SERVER_DENIED_ID;
-	}
-	if (strncmp(approved, protocol, sizeof(protocol)) == 0)
-	{
-		exit_code = SERVER_APPROVED_ID;
-	}	
-	//Debug
-	printf("denied: %s size: %d\napproved: %s size: %d\nprotocol: %s size: %d\n",
-		denied, sizeof(denied), approved, sizeof(approved), protocol, sizeof(protocol));
-FailAfterApproved:
-	free(approved);
-Fail:	
-	free(denied);
-Exit:
-	return exit_code;
-}
 int GET__Response_ID(char* protocol)
 {
 	char* message_type = GET__Message_Type(protocol);	
@@ -125,4 +86,66 @@ Free:
 	free(message_type);
 Exit:
 	return exit_char;
+}
+
+int SendBuffer(SOCKET sd, const char* Buffer, int BytesToSend)
+{
+	const char* CurPlacePtr = Buffer;
+	int BytesTransferred;
+	int RemainingBytesToSend = BytesToSend;
+
+	while (RemainingBytesToSend > 0)
+	{
+		/* send does not guarantee that the entire message is sent */
+		BytesTransferred = send(sd, CurPlacePtr, RemainingBytesToSend, 0);
+		if (BytesTransferred == SOCKET_ERROR)
+		{
+			printf("send() failed, error %d\n", WSAGetLastError());
+			return -1;
+		}
+		printf("Number of bytes send: %d out of total %d\n", BytesTransferred, BytesToSend);
+		RemainingBytesToSend -= BytesTransferred;
+		CurPlacePtr += BytesTransferred;
+	}
+	return 0;
+}
+int Send_Socket(SOCKET s, const char* buffer, int len)
+{
+	return SendBuffer(s, buffer, len);
+}
+int ReceiveBuffer(SOCKET sd, char* OutputBuffer, int BytesToReceive)
+{
+	char* CurPlacePtr = OutputBuffer;
+	int BytesJustTransferred;
+	int RemainingBytesToReceive = BytesToReceive;
+
+	while (RemainingBytesToReceive > 0)
+	{
+		/* send does not guarantee that the entire message is sent */
+		BytesJustTransferred = recv(sd, CurPlacePtr, 1, 0);
+		if (BytesJustTransferred == SOCKET_ERROR)
+		{
+			printf("recv() failed, error %d\n", WSAGetLastError());
+			return -1;
+		}
+		else if (BytesJustTransferred == 0)
+		{
+			return 1; // recv() returns zero if connection was gracefully disconnected.
+		}
+
+		RemainingBytesToReceive -= BytesJustTransferred;
+		if (*CurPlacePtr == '\n')
+		{
+			*CurPlacePtr = '\0';
+			printf("Remaining of 100 : %d\n", RemainingBytesToReceive);
+			break;
+		}
+		CurPlacePtr += BytesJustTransferred; // <ISP> pointer arithmetic
+	}
+
+	return 0;
+}
+int Recv_Socket(SOCKET s, char* buffer)
+{
+	return ReceiveBuffer(s, buffer, MAX_PRO_LEN);
 }

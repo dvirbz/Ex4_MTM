@@ -26,18 +26,19 @@ enum Player_Status
 
 int InitializeWSA();
 int Connect_Socket(SOCKET s, SOCKADDR* cs);
-int SendBuffer(SOCKET sd, const char* Buffer, int BytesToSend);
-int Send_Socket(SOCKET s, const char* buffer, int len);
-int ReceiveBuffer(SOCKET sd, char* OutputBuffer, int BytesToReceive);
-int Recv_Socket(SOCKET s, char* buffer);
+
 void Connect_MENU(char server_ip[], int server_port);
 void Denied_MENU(char server_ip[], int server_port);
 void Choose_Next_Connect();
 void Choose_Next_Play();
+int GET__Connect_Player_Decision();
+int GET__Play_Player_Decision();
+int Handle_Client_Request(SOCKET s_client, char* username,char * client_request);
+int GET__Server_Response(SOCKET s_client, char* server_response);
 
 int main(int argc, char* argv[])
 {
-	int error_code = 0;
+	int exit_code = 0;
 	assert(argc == ArgumetnNumber);
 	/* Init Connection Params */
 	char server_ip_address[MAX_IP_LEN], username[MAX_USERNAME_LEN];
@@ -64,26 +65,18 @@ int main(int argc, char* argv[])
 
 	/* Connecting */
 	int connect_status = CONNECT, play_status = TRUE;
+	char* client_message = (char*)calloc(MAX_PRO_LEN, sizeof(char));
+	char* server_response = (char*)calloc(MAX_PRO_LEN, sizeof(char));
+
 	while (connect_status == CONNECT)
 	{
 		if (Connect_Socket(s_client, (SOCKADDR*)&clientService) != 0)
 		{
 			Connect_MENU(server_ip_address, server_port_number);
-			if (scanf_s("%d", &connect_status) == 0)
+			connect_status = GET__Connect_Player_Decision();
+			if (connect_status != CONNECT)
 			{
-				error_code = -1;
-				goto ExitSeq;
-			}
-			switch (connect_status)
-			{
-			case 1:connect_status = CONNECT;
-				break;
-			case 2:connect_status = EXIT;
-				break;
-			}
-			if (connect_status == EXIT)
-			{
-				error_code = -1;
+				exit_code = -1;
 				goto ExitSeq;
 			}
 			else
@@ -91,67 +84,34 @@ int main(int argc, char* argv[])
 				continue;
 			}
 		}
-
 		printf("Connected to server on %s:%d\n", server_ip_address, server_port_number);
-		/*===============================================================================*/
-			/* Client Request */
-		int client_req_size = strlen(CLIENT_REQUEST) + strlen(END_PROTOCOL) + strlen(username) + 2;
-		char* client_request = (char*)calloc(client_req_size, sizeof(char));
-		if (GET__CLIENT_REQUEST_PRO(client_request, username) == -1)
+	/*===============================================================================*/
+		/* Client Request */
+		if (Handle_Client_Request(s_client, username,client_message) == -1)
 		{
-			printf("Protocol failed\n");
-			error_code = -1;
-			free(client_request);
+			exit_code = -1;
 			goto ExitSeq;
-		}
-		if (Send_Socket(s_client, client_request, client_req_size - 1) == -1)
-		{
-			printf("Send Failed\n");
-			free(client_request);
-			goto ExitSeq;
-		}
-		free(client_request);
-		
-		/* Get Server Response */
-		char* server_response = (char*)calloc(MAX_PRO_LEN, sizeof(char));
-		if (Recv_Socket(s_client, server_response) == -1)
-		{
-			printf("Recv Failed\n");
-			error_code = -1;
-			goto ExitSeq;
-		}
-		int response_id = GET__Response_ID(server_response);//change
-		printf("Response id: %d\n", response_id);
-		switch (response_id)
+		}		
+		/* Get Server Response */		
+		switch (GET__Server_Response(s_client, server_response))
 		{
 		case SERVER_DENIED_ID:
 			Denied_MENU(server_ip_address, server_port_number);
-			if (scanf_s("%d", &connect_status) == 0)
+			connect_status = GET__Connect_Player_Decision();
+			if (connect_status != CONNECT)
 			{
-				error_code = -1;
+				exit_code = -1;
 				goto ExitSeq;
-			}
-			switch (connect_status)
-			{
-			case 1:connect_status = CONNECT;
-				break;
-			case 2:connect_status = EXIT;
-				break;
-			}
-			if (connect_status == EXIT)
-			{
-				error_code = -1;
-				goto ExitSeq;
-			}
+			}					
 			if (closesocket(s_client) == SOCKET_ERROR)
 			{
-				error_code = -1;
+				exit_code = -1;
 				goto ExitSeq;
 			}
 			s_client = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
 			if (s_client == INVALID_SOCKET)
 			{
-				error_code = -1;
+				exit_code = -1;
 				goto Exit_WO_CLOSE;
 			}
 			break;
@@ -159,6 +119,8 @@ int main(int argc, char* argv[])
 			connect_status = PLAY;
 			break;
 		default:printf("pro: %s size: %d\n", server_response, sizeof(server_response));
+			exit_code = -1;
+			goto ExitSeq;
 			break;
 		}
 	}
@@ -166,28 +128,27 @@ int main(int argc, char* argv[])
 	while (play_status == PLAY)
 	{
 		Choose_Next_Play();
-		if (scanf_s("%d", &play_status) == 0)
+		play_status = GET__Play_Player_Decision();
+		if (play_status != CONNECT)
 		{
-			error_code = -1;
+			exit_code = -1;
 			goto ExitSeq;
 		}
-		switch (play_status)
+		else
 		{
-		case 1:play_status = PLAY;
-			break;
-		case 2:play_status = EXIT;
-			break;
+			continue;
 		}
 		if (play_status != PLAY)
 		{
-			error_code = -1;
+			exit_code = -1;
 			goto ExitSeq;
 		}
 	}
-
 	printf("All will be well %s, PortNumber: %d\n", username, server_port_number);
 
 ExitSeq:
+	free(client_message);
+	free(server_response);
 	if (closesocket(s_client) == SOCKET_ERROR)
 	{
 		printf("Failed to close MainSocket, error %ld. Ending program\n", WSAGetLastError());
@@ -197,7 +158,7 @@ Exit_WO_CLOSE:
 	{
 		printf("Failed to close Winsocket, error %ld. Ending program.\n", WSAGetLastError());
 	}
-	return error_code;
+	return exit_code;
 }
 
 void Connect_MENU(char server_ip[],int server_port) {
@@ -240,70 +201,65 @@ int Connect_Socket(SOCKET s, SOCKADDR* cs)
 	}	
 	return 0;
 }
-int SendBuffer(SOCKET sd,const char* Buffer, int BytesToSend)
+int GET__Connect_Player_Decision()
 {
-	const char* CurPlacePtr = Buffer;
-	int BytesTransferred;
-	int RemainingBytesToSend = BytesToSend;
-
-	while (RemainingBytesToSend > 0)
+	int connect_status = 0;
+	if (scanf_s("%d", &connect_status) == 0)
 	{
-		/* send does not guarantee that the entire message is sent */
-		BytesTransferred = send(sd, CurPlacePtr, RemainingBytesToSend, 0);
-		if (BytesTransferred == SOCKET_ERROR)
-		{
-			printf("send() failed, error %d\n", WSAGetLastError());
-			return -1;
-		}
-		printf("Number of bytes send: %d out of total %d\n", BytesTransferred, BytesToSend);
-		RemainingBytesToSend -= BytesTransferred;
-		CurPlacePtr += BytesTransferred;
+		return -1;
 	}
-	return 0;
-}
-int Send_Socket(SOCKET s, const char * buffer, int len)
-{
-	return SendBuffer(s, buffer, len);
-}
-int ReceiveBuffer(SOCKET sd, char* OutputBuffer, int BytesToReceive)
-{
-	char* CurPlacePtr = OutputBuffer;
-	int BytesJustTransferred;
-	int RemainingBytesToReceive = BytesToReceive;
-
-	while (RemainingBytesToReceive > 0)
+	switch (connect_status)
 	{
-		/* send does not guarantee that the entire message is sent */
-		BytesJustTransferred = recv(sd, CurPlacePtr, 1, 0);
-		if (BytesJustTransferred == SOCKET_ERROR)
-		{
-			printf("recv() failed, error %d\n", WSAGetLastError());
-			return -1;
-		}
-		else if (BytesJustTransferred == 0)
-		{
-			return 1; // recv() returns zero if connection was gracefully disconnected.
-		}
-
-		RemainingBytesToReceive -= BytesJustTransferred;
-		if (*CurPlacePtr == '\n')
-		{			
-			*CurPlacePtr = '\0';
-			printf("Remaining of 100 : %d\n", RemainingBytesToReceive);
-			break;
-		}
-		CurPlacePtr += BytesJustTransferred; // <ISP> pointer arithmetic
+	case 1:return CONNECT;
+		break;
+	case 2:return EXIT;
+		break;
 	}
-
-	return 0;
+	return -1;
 }
-int Recv_Socket(SOCKET s, char* buffer)
+int GET__Play_Player_Decision()
 {
-	return ReceiveBuffer(s, buffer, MAX_PRO_LEN);
+	int play_status = 0;
+	if (scanf_s("%d", &play_status) == 0)
+	{
+		return -1;
+	}
+	switch (play_status)
+	{
+	case 1:return CONNECT;
+		break;
+	case 2:return EXIT;
+		break;
+	}
+	return -1;
 }
 int Connect_to_Server()
 {
 	return 0;
+}
+int Handle_Client_Request(SOCKET s_client, char* username, char * client_request)
+{
+	int client_req_size = strlen(CLIENT_REQUEST) + strlen(END_PROTOCOL) + strlen(username) + 1;	
+	if (GET__CLIENT_REQUEST_PRO(client_request, username) == -1)
+	{
+		printf("Protocol failed\n");		
+		return -1;
+	}
+	if (Send_Socket(s_client, client_request, client_req_size) == -1)
+	{
+		printf("Send Failed\n");		
+		return -1;
+	}	
+	return 0;
+}
+int GET__Server_Response(SOCKET s_client, char * server_response)
+{	
+	if (Recv_Socket(s_client, server_response) == -1)
+	{
+		printf("Recv Failed\n");
+		return -1;
+	}
+	return GET__Response_ID(server_response);
 }
 
 /*time_t x = time(NULL);
