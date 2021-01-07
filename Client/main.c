@@ -17,12 +17,23 @@
 #define USER_ARG_NUM 3
 #define DECIMAL_BASE 10
 
+enum Player_Status
+{
+	CONNECT,
+	EXIT,
+	PLAY
+};
+
 int InitializeWSA();
 int Connect_Socket(SOCKET s, SOCKADDR* cs);
 int SendBuffer(SOCKET sd, const char* Buffer, int BytesToSend);
 int Send_Socket(SOCKET s, const char* buffer, int len);
 int ReceiveBuffer(SOCKET sd, char* OutputBuffer, int BytesToReceive);
 int Recv_Socket(SOCKET s, char* buffer);
+void Connect_MENU(char server_ip[], int server_port);
+void Denied_MENU(char server_ip[], int server_port);
+void Choose_Next_Connect();
+void Choose_Next_Play();
 
 int main(int argc, char* argv[])
 {
@@ -52,82 +63,136 @@ int main(int argc, char* argv[])
 	/*===============================================================================*/
 
 	/* Connecting */
-	int reconnect = TRUE;
-	while (Connect_Socket(s_client, (SOCKADDR*)&clientService) != 0)
+	int connect_status = CONNECT, play_status = TRUE;
+	while (connect_status == CONNECT)
 	{
-		printf("Failed connecting to server on %s:%d\n", server_ip_address, server_port_number);
-		printf("Choose what to do next:\n");
-		printf("1. Try to reconnect\n");
-		printf("2. Exit\n");
-		if (scanf_s("%d", &reconnect) == 0)
+		if (Connect_Socket(s_client, (SOCKADDR*)&clientService) != 0)
+		{
+			Connect_MENU(server_ip_address, server_port_number);
+			if (scanf_s("%d", &connect_status) == 0)
+			{
+				error_code = -1;
+				goto ExitSeq;
+			}
+			switch (connect_status)
+			{
+			case 1:connect_status = CONNECT;
+				break;
+			case 2:connect_status = EXIT;
+				break;
+			}
+			if (connect_status == EXIT)
+			{
+				error_code = -1;
+				goto ExitSeq;
+			}
+			else
+			{
+				continue;
+			}
+		}
+
+		printf("Connected to server on %s:%d\n", server_ip_address, server_port_number);
+		/*===============================================================================*/
+			/* Client Request */
+		int client_req_size = strlen(CLIENT_REQUEST) + strlen(END_PROTOCOL) + strlen(username) + 2;
+		char* client_request = (char*)calloc(client_req_size, sizeof(char));
+		if (GET__CLIENT_REQUEST_PRO(client_request, username) == -1)
+		{
+			printf("Protocol failed\n");
+			error_code = -1;
+			free(client_request);
+			goto ExitSeq;
+		}
+		if (Send_Socket(s_client, client_request, client_req_size - 1) == -1)
+		{
+			printf("Send Failed\n");
+			free(client_request);
+			goto ExitSeq;
+		}
+		free(client_request);
+		
+		/* Get Server Response */
+		char* server_response = (char*)calloc(MAX_PRO_LEN, sizeof(char));
+		if (Recv_Socket(s_client, server_response) == -1)
+		{
+			printf("Recv Failed\n");
+			error_code = -1;
+			goto ExitSeq;
+		}
+		int response_id = GET__Response_ID(server_response);//change
+		printf("Response id: %d\n", response_id);
+		switch (response_id)
+		{
+		case SERVER_DENIED_ID:
+			Denied_MENU(server_ip_address, server_port_number);
+			if (scanf_s("%d", &connect_status) == 0)
+			{
+				error_code = -1;
+				goto ExitSeq;
+			}
+			switch (connect_status)
+			{
+			case 1:connect_status = CONNECT;
+				break;
+			case 2:connect_status = EXIT;
+				break;
+			}
+			if (connect_status == EXIT)
+			{
+				error_code = -1;
+				goto ExitSeq;
+			}
+			if (closesocket(s_client) == SOCKET_ERROR)
+			{
+				error_code = -1;
+				goto ExitSeq;
+			}
+			s_client = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+			if (s_client == INVALID_SOCKET)
+			{
+				error_code = -1;
+				goto Exit_WO_CLOSE;
+			}
+			break;
+		case SERVER_APPROVED_ID:
+			connect_status = PLAY;
+			break;
+		default:printf("pro: %s size: %d\n", server_response, sizeof(server_response));
+			break;
+		}
+	}
+	play_status = connect_status;
+	while (play_status == PLAY)
+	{
+		Choose_Next_Play();
+		if (scanf_s("%d", &play_status) == 0)
 		{
 			error_code = -1;
 			goto ExitSeq;
 		}
-		if (reconnect != TRUE)
+		switch (play_status)
+		{
+		case 1:play_status = PLAY;
+			break;
+		case 2:play_status = EXIT;
+			break;
+		}
+		if (play_status != PLAY)
 		{
 			error_code = -1;
 			goto ExitSeq;
 		}
 	}
-	printf("Connected to server on %s:%d\n", server_ip_address, server_port_number);
-	/*===============================================================================*/
-	/* Client Request */
-	int client_req_size = sizeof(CLIENT_REQUEST) + sizeof(END_PROTOCOL) + sizeof(username) + 1;
-	char* client_request = (char*)calloc(client_req_size, sizeof(char));
-	if (GET__CLIENT_REQUEST_PRO((&client_request), username) == -1)
-	{
-		printf("Protocol failed\n");
-		error_code = -1;
-		goto FreeCR;
-	}	
-	if (Send_Socket(s_client, client_request, client_req_size) == -1)
-	{
-		printf("Send Failed\n");
-		error_code = -1;
-		goto FreeCR;
-	}
-	/*time_t x = time(NULL);
-	while (time(NULL) > x + 7);*/
-	
-	/* Get Server Response */
-	char* server_response = (char*)calloc(MAX_PRO_LEN, sizeof(char));
-	if (Recv_Socket(s_client, server_response) == -1)
-	{
-		printf("Recv Failed\n");
-		error_code = -1;
-		goto FreeCR;
-	}
-	int response_id = IS_Denied_or_Approved(server_response);
-	printf("Response id: %d\n", response_id);
-	switch (response_id)
-	{
-	case SERVER_DENIED_R:
-		printf("Server on %s:%d denied the connection request.\n", server_ip_address, server_port_number);
-		printf("Choose what to do next:\n");
-		printf("1. Try to reconnect\n");
-		printf("2. Exit\n");
-		break;
-	case SERVER_APPROVED_R:
-		printf("Choose what to do next:\n");
-		printf("1. Play against another client\n");
-		printf("2. Quit\n");
-		break;
-	default:printf("pro: %s size: %d\n", server_response, sizeof(response_id));
-		break;
-	}
-	
 
 	printf("All will be well %s, PortNumber: %d\n", username, server_port_number);
-
-FreeCR:
-	free(client_request);
 
 ExitSeq:
 	if (closesocket(s_client) == SOCKET_ERROR)
 	{
 		printf("Failed to close MainSocket, error %ld. Ending program\n", WSAGetLastError());
 	}
+Exit_WO_CLOSE:
 	if (WSACleanup() == SOCKET_ERROR)
 	{
 		printf("Failed to close Winsocket, error %ld. Ending program.\n", WSAGetLastError());
@@ -135,6 +200,26 @@ ExitSeq:
 	return error_code;
 }
 
+void Connect_MENU(char server_ip[],int server_port) {
+	printf("Failed connecting to server on %s:%d\n", server_ip, server_port);
+	Choose_Next_Connect();
+}
+void Denied_MENU(char server_ip[], int server_port) {
+	printf("Server on %s:%d denied the connection request.\n", server_ip, server_port);
+	Choose_Next_Connect();
+}
+void Choose_Next_Connect()
+{
+	printf("Choose what to do next:\n");
+	printf("1. Try to reconnect\n");
+	printf("2. Exit\n");
+}
+void Choose_Next_Play()
+{
+	printf("Choose what to do next:\n");
+	printf("1. Play against another client\n");
+	printf("2. Quit\n");
+}
 int InitializeWSA()
 {
 	WSADATA wsaData;
@@ -216,3 +301,10 @@ int Recv_Socket(SOCKET s, char* buffer)
 {
 	return ReceiveBuffer(s, buffer, MAX_PRO_LEN);
 }
+int Connect_to_Server()
+{
+	return 0;
+}
+
+/*time_t x = time(NULL);
+while (time(NULL) > x + 7);*/
