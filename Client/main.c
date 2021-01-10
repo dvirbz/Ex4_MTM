@@ -10,31 +10,61 @@
 #pragma comment(lib,"ws2_32.lib")
 
 #define ArgumetnNumber 4
-#define MAX_USERNAME_LEN 20
+
 #define MAX_IP_LEN 15
 #define IP_ARG_NUM 1
 #define PORT_ARG_NUM 2
 #define USER_ARG_NUM 3
-#define DECIMAL_BASE 10
 
-enum Player_Status
+
+
+typedef enum 
 {
 	CONNECT,
 	EXIT,
-	PLAY
-};
+	PLAY,
+	MENU
+}Player_Status;
+typedef enum 
+{
+	SETUP,
+	GUESS,
+	END
+}Game_Status;
 
 int InitializeWSA();
 int Connect_Socket(SOCKET s, SOCKADDR* cs);
 
-void Connect_MENU(char server_ip[], int server_port);
-void Denied_MENU(char server_ip[], int server_port);
-void Choose_Next_Connect();
-void Choose_Next_Play();
+/* Player Related Func*/
 int GET__Connect_Player_Decision();
 int GET__Play_Player_Decision();
-int Handle_Client_Request(SOCKET s_client, char* username,char * client_request);
+void Choose_Next_Connect();
+void Choose_Next_Play();
+void Connect_MENU(char server_ip[], int server_port);
+void Denied_MENU(char server_ip[], int server_port);
+
+
+int Game_Guess(Game_Status guess_status, SOCKET s_client,
+	char* server_response, char* guess_seq, char* client_message);
+int Game_Setup(Game_Status guess_status, SOCKET s_client, char* server_response,
+	char* guess_seq, char* client_message);
+int Game(Player_Status play_status, Game_Status guess_status, SOCKET s_client, char* server_response,
+	char* guess_seq, char* client_message);
+int Connect(SOCKET s_client, SOCKADDR_IN clientService, char* server_response, int server_port_number,
+	char* server_ip_address, char* username, char* guess_seq,
+	char* client_message, Player_Status connect_status);
+
+/* Server Related Func*/
 int GET__Server_Response(SOCKET s_client, char* server_response);
+int Handle_Server_Main_Menu(SOCKET s_client, char* server_response,
+	Player_Status play_status, char* client_message);
+
+/* Client Related Func*/
+int Handle_Client_Request(SOCKET s_client, char* username, char* client_request);
+int Handle_Client_Versus(SOCKET s_client, char* client_versus);
+int Handle_Client_Disconnect(SOCKET s_client, char* client_disconnect);
+int Handle_Client_Setup(SOCKET s_client, char* client_message, char* setup_seq);
+int Handle_Client_Player_Move(SOCKET s_client, char* client_message, char* guess_seq);
 
 int main(int argc, char* argv[])
 {
@@ -62,93 +92,67 @@ int main(int argc, char* argv[])
 	clientService.sin_addr.s_addr = inet_addr(server_ip_address);
 	clientService.sin_port = htons(server_port_number);
 	/*===============================================================================*/
+	
+	/* Init Commune Params */	
+	Player_Status connect_status = CONNECT, play_status = PLAY;
+	Game_Status guess_status = END;
+	char* client_message = (char*)calloc(MAX_PRO_LEN, sizeof(char));
+	if (client_message == NULL)
+	{
+		exit_code = -1;
+		goto Exit_WO_FREE;
+	}
+	char* server_response = (char*)calloc(MAX_PRO_LEN, sizeof(char));
+	if (server_response == NULL)
+	{
+		free(client_message);
+		exit_code = -1;
+		goto Exit_WO_FREE;
+	}
+	char* guess_seq = (char*)calloc(NUM_DIGITIS_GUESS, sizeof(char));
+	if (guess_seq == NULL)
+	{
+		free(server_response);
+		exit_code = -1;
+		goto Exit_WO_FREE;
+	}
+	/*===============================================================================*/
 
 	/* Connecting */
-	int connect_status = CONNECT, play_status = TRUE;
-	char* client_message = (char*)calloc(MAX_PRO_LEN, sizeof(char));
-	char* server_response = (char*)calloc(MAX_PRO_LEN, sizeof(char));
-
-	while (connect_status == CONNECT)
+	connect_status = Connect(s_client, clientService, server_response, server_port_number, server_ip_address,
+		username, guess_seq, client_message, connect_status);
+	if (connect_status == -1)
 	{
-		if (Connect_Socket(s_client, (SOCKADDR*)&clientService) != 0)
-		{
-			Connect_MENU(server_ip_address, server_port_number);
-			connect_status = GET__Connect_Player_Decision();
-			if (connect_status != CONNECT)
-			{
-				exit_code = -1;
-				goto ExitSeq;
-			}
-			else
-			{
-				continue;
-			}
-		}
-		printf("Connected to server on %s:%d\n", server_ip_address, server_port_number);
+		exit_code = -1;
+		free(guess_seq);
+		free(client_message);
+		free(server_response);
+		goto Exit_WO_CLOSE;
+	}	
 	/*===============================================================================*/
-		/* Client Request */
-		if (Handle_Client_Request(s_client, username,client_message) == -1)
-		{
-			exit_code = -1;
-			goto ExitSeq;
-		}		
-		/* Get Server Response */		
-		switch (GET__Server_Response(s_client, server_response))
-		{
-		case SERVER_DENIED_ID:
-			Denied_MENU(server_ip_address, server_port_number);
-			connect_status = GET__Connect_Player_Decision();
-			if (connect_status != CONNECT)
-			{
-				exit_code = -1;
-				goto ExitSeq;
-			}					
-			if (closesocket(s_client) == SOCKET_ERROR)
-			{
-				exit_code = -1;
-				goto ExitSeq;
-			}
-			s_client = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
-			if (s_client == INVALID_SOCKET)
-			{
-				exit_code = -1;
-				goto Exit_WO_CLOSE;
-			}
-			break;
-		case SERVER_APPROVED_ID:
-			connect_status = PLAY;
-			break;
-		default:printf("pro: %s size: %d\n", server_response, sizeof(server_response));
-			exit_code = -1;
-			goto ExitSeq;
-			break;
-		}
-	}
+
 	play_status = connect_status;
-	while (play_status == PLAY)
+	/* SERVER_MAIN_MENU*/
+	if (Handle_Server_Main_Menu(s_client, server_response, play_status, client_message) == -1)
 	{
-		Choose_Next_Play();
-		play_status = GET__Play_Player_Decision();
-		if (play_status != CONNECT)
-		{
-			exit_code = -1;
-			goto ExitSeq;
-		}
-		else
-		{
-			continue;
-		}
-		if (play_status != PLAY)
-		{
-			exit_code = -1;
-			goto ExitSeq;
-		}
+		exit_code = -1;
+		goto ExitSeq;
 	}
-	printf("All will be well %s, PortNumber: %d\n", username, server_port_number);
+	/*===============================================================================*/
+
+	/* Let's Play */
+	if (Game(play_status, guess_status, s_client, server_response, guess_seq, client_message) == -1)
+	{
+		exit_code = -1;
+		goto ExitSeq;
+	}
+	/*===============================================================================*/
 
 ExitSeq:
+	free(guess_seq);
 	free(client_message);
 	free(server_response);
+Exit_WO_FREE:
 	if (closesocket(s_client) == SOCKET_ERROR)
 	{
 		printf("Failed to close MainSocket, error %ld. Ending program\n", WSAGetLastError());
@@ -159,6 +163,27 @@ Exit_WO_CLOSE:
 		printf("Failed to close Winsocket, error %ld. Ending program.\n", WSAGetLastError());
 	}
 	return exit_code;
+}
+
+int InitializeWSA()
+{
+	WSADATA wsaData;
+	int iResult = WSAStartup(MAKEWORD(2, 2), &wsaData);
+	if (iResult != NO_ERROR)
+	{
+		printf("Error at WSAStartup()\n");
+		return -1;
+	}
+	return 0;
+}
+int Connect_Socket(SOCKET s, SOCKADDR* cs)
+{
+	if (connect(s, cs, sizeof(*cs)) == SOCKET_ERROR)
+	{
+		printf("%d\n", WSAGetLastError());
+		return -1;
+	}
+	return 0;
 }
 
 void Connect_MENU(char server_ip[],int server_port) {
@@ -181,26 +206,6 @@ void Choose_Next_Play()
 	printf("1. Play against another client\n");
 	printf("2. Quit\n");
 }
-int InitializeWSA()
-{
-	WSADATA wsaData;
-	int iResult = WSAStartup(MAKEWORD(2, 2), &wsaData);
-	if (iResult != NO_ERROR)
-	{
-		printf("Error at WSAStartup()\n");
-		return -1;
-	}
-	return 0;
-}
-int Connect_Socket(SOCKET s, SOCKADDR* cs)
-{
-	if (connect(s, cs, sizeof(*cs)) == SOCKET_ERROR)
-	{	
-		printf("%d\n", WSAGetLastError());
-		return -1;
-	}	
-	return 0;
-}
 int GET__Connect_Player_Decision()
 {
 	int connect_status = 0;
@@ -208,6 +213,7 @@ int GET__Connect_Player_Decision()
 	{
 		return -1;
 	}
+	fflush(stdin);
 	switch (connect_status)
 	{
 	case 1:return CONNECT;
@@ -224,36 +230,311 @@ int GET__Play_Player_Decision()
 	{
 		return -1;
 	}
+	fflush(stdin);
 	switch (play_status)
 	{
-	case 1:return CONNECT;
+	case 1:return PLAY;
 		break;
 	case 2:return EXIT;
 		break;
 	}
 	return -1;
 }
-int Connect_to_Server()
+
+int Game_Guess(Game_Status guess_status,SOCKET s_client, char* server_response,
+	char* guess_seq, char* client_message)
 {
+	while (guess_status == GUESS)
+	{
+		int server_res_id = GET__Server_Response(s_client, server_response);
+		if (server_res_id == SERVER_PLAYER_MOVE_REQUEST_ID)
+		{
+			printf("Choose your guess:\n");
+			if (scanf_s("%s", guess_seq, NUM_DIGITIS_GUESS) == 0)
+			{
+				printf("oof");
+				return -1;
+				
+			}
+			fflush(stdin);
+			printf("guess: %s\n", guess_seq);
+			if (Handle_Client_Player_Move(s_client, client_message, guess_seq) == -1)
+			{
+				return -1;
+			}
+		}
+		else
+		{
+			printf("SERVER_PLAYER_MOVE_REQUEST_ID pro: %s server_res_id: %d\n",server_response, server_res_id);
+			return -1;
+		}
+		server_res_id = GET__Server_Response(s_client, server_response);
+		BnC_Data* data = GET__BnC_Data(server_response);
+		switch (server_res_id)
+		{
+		case SERVER_GAME_RESULTS_ID:
+			printf("Bulls: %d\nCows: %d\n%s played: %s\n",
+				data->bulls, data->cows, data->opp_username, data->opp_move);
+			free(data);			
+			break;
+		case SERVER_WIN_ID:
+			printf("%s won!\nOpponent's number was %s\n",
+				data->opp_username, data->opp_move);
+			free(data);
+			return END;
+			break;
+		case SERVER_DRAW_ID:
+			printf("It's a tie\n");
+			return END;
+			break;
+		case SERVER_OPPONENT_QUIT_ID:
+			printf("Opponent quit.\n");
+			return END;
+			break;
+		default:printf("SERVER_GAME_RESULTS_ID pro: %s id: %d\n", server_response, server_res_id);
+			return -1;
+			break;
+		}
+	}
+	return guess_status;
+}
+int Game_Setup(Game_Status guess_status, SOCKET s_client, char* server_response,
+	char* guess_seq, char* client_message)
+{
+	int server_res_id = GET__Server_Response(s_client, server_response);
+	if (server_res_id == SERVER_SETUP_REQUEST_ID)
+	{
+		printf("Choose your 4 digits:\n");
+		if (scanf_s("%s", guess_seq, NUM_DIGITIS_GUESS) == 0)
+		{
+			printf("oof");
+			return -1;
+		}
+		fflush(stdin);
+		printf("setup: %s\n", guess_seq);
+		if (Handle_Client_Setup(s_client, client_message, guess_seq) == -1)
+		{
+			return -1;
+		}
+	}
+	else
+	{
+		printf("SERVER_SETUP_REQUEST_ID pro: %s server_res_id: %d\n",server_response, server_res_id);
+		return -1;
+	}
 	return 0;
 }
-int Handle_Client_Request(SOCKET s_client, char* username, char * client_request)
+int Game(Player_Status play_status, Game_Status guess_status, SOCKET s_client, char* server_response,
+	char* guess_seq, char* client_message)
 {
-	int client_req_size = strlen(CLIENT_REQUEST) + strlen(END_PROTOCOL) + strlen(username) + 1;	
-	if (GET__CLIENT_REQUEST_PRO(client_request, username) == -1)
+	while (play_status == PLAY)
+	{
+		int server_res_id = GET__Server_Response(s_client, server_response);
+		switch (server_res_id)
+		{
+		case SERVER_INVITE_ID:
+			printf("Game is on!\n");
+			guess_status = SETUP;
+			break;
+		case SERVER_NO_OPPONENTS_ID:
+			play_status = MENU;
+			break;
+		default:printf("SERVER_NO_OPPONENTS_ID SERVER_INVITE_ID pro: %s id: %d\n", server_response, server_res_id);
+			Handle_Client_Disconnect(s_client, client_message);
+			return -1;
+			break;
+		}
+		if (guess_status == SETUP)
+		{
+			if (Game_Setup(guess_status, s_client,
+				server_response, guess_seq, client_message) == -1)
+			{
+				return -1;
+			}
+			guess_status = GUESS;
+		}
+		guess_status = Game_Guess(guess_status, s_client, server_response,
+			guess_seq, client_message);		
+		if (guess_status == -1)
+			return -1;
+		if (play_status == MENU || guess_status == END)
+		{
+			if (Handle_Server_Main_Menu(s_client, server_response, play_status, client_message) == -1)
+			{
+				return -1;
+			}
+		}
+	}
+	return 0;
+}
+int Connect(SOCKET s_client, SOCKADDR_IN clientService, char* server_response,int server_port_number,
+	char * server_ip_address, char *username, char* guess_seq,
+	char* client_message, Player_Status connect_status )
+{
+	while (connect_status == CONNECT)
+	{
+		if (Connect_Socket(s_client, (SOCKADDR*)&clientService) != 0)
+		{
+			Connect_MENU(server_ip_address, server_port_number);
+			connect_status = GET__Connect_Player_Decision();
+			if (connect_status != CONNECT)
+			{
+				goto ExitSeq;
+			}
+			else
+			{
+				continue;
+			}
+		}
+		printf("Connected to server on %s:%d\n", server_ip_address, server_port_number);
+		/*===============================================================================*/
+			/* Client Request */
+		if (Handle_Client_Request(s_client, username, client_message) == -1)
+		{
+			return -1;
+		}
+		/* Get Server Response */
+		int server_res_id = GET__Server_Response(s_client, server_response);
+		switch (server_res_id)
+		{
+		case SERVER_DENIED_ID:
+			Denied_MENU(server_ip_address, server_port_number);
+			connect_status = GET__Connect_Player_Decision();
+			if (connect_status != CONNECT)
+			{				
+				goto ExitSeq;
+			}
+			if (closesocket(s_client) == SOCKET_ERROR)
+			{				
+				goto ExitSeq;
+			}
+			s_client = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+			if (s_client == INVALID_SOCKET)
+			{				
+				return -1;
+			}
+			break;
+		case SERVER_APPROVED_ID:
+			return PLAY;
+			break;
+		default:printf("SERVER_APPROVED_ID pro: %s id: %d\n", server_response, server_res_id);
+			goto ExitSeq;
+			break;
+		}
+	}
+ExitSeq:
+	if (closesocket(s_client) == SOCKET_ERROR)
+	{
+		printf("Failed to close MainSocket, error %ld. Ending program\n", WSAGetLastError());
+	}
+	return -1;
+}
+
+int Handle_Client_Request(SOCKET s_client, char* username, char * client_message)
+{
+	int client_mes_size = strlen(CLIENT_REQUEST) + strlen(END_PROTOCOL) + strlen(username) + 1;
+	if (GET__CLIENT_REQUEST_PRO(client_message, username) == -1)
 	{
 		printf("Protocol failed\n");		
 		return -1;
 	}
-	if (Send_Socket(s_client, client_request, client_req_size) == -1)
+	if (Send_Socket(s_client, client_message, client_mes_size) == -1)
 	{
 		printf("Send Failed\n");		
 		return -1;
 	}	
 	return 0;
 }
+int Handle_Client_Disconnect(SOCKET s_client, char* client_message) {
+	int client_mes_size = strlen(CLIENT_DISCONNECT) + strlen(END_PROTOCOL);
+	if (GET__CLIENT_DISCONNECT_PRO(client_message) == -1)
+	{
+		printf("Protocol failed\n");
+		return -1;
+	}
+	if (Send_Socket(s_client, client_message, client_mes_size) == -1)
+	{
+		printf("Send Failed\n");
+		return -1;
+	}
+	return 0;
+}
+int Handle_Client_Versus(SOCKET s_client, char* client_message) {
+	int client_mes_size = strlen(CLIENT_VERSUS) + strlen(END_PROTOCOL);
+	if (GET__CLIENT_VERSUS_PRO(client_message) == -1)
+	{
+		printf("Protocol failed\n");
+		return -1;
+	}
+	if (Send_Socket(s_client, client_message, client_mes_size) == -1)
+	{
+		printf("Send Failed\n");
+		return -1;
+	}
+	return 0;
+}
+int Handle_Client_Setup(SOCKET s_client, char* client_message, char* setup_seq) {
+	int client_mes_size = strlen(CLIENT_SETUP) + strlen(END_PROTOCOL) + strlen(setup_seq) +1;
+	if (GET__CLIENT_SETUP_PRO(client_message, setup_seq) == -1)
+	{
+		printf("Protocol failed\n");
+		return -1;
+	}
+	if (Send_Socket(s_client, client_message, client_mes_size) == -1)
+	{
+		printf("Send Failed\n");
+		return -1;
+	}
+	return 0;
+}
+int Handle_Client_Player_Move(SOCKET s_client, char* client_message, char* guess_seq)
+{
+	int client_mes_size = strlen(CLIENT_PLAYER_MOVE) + strlen(END_PROTOCOL) + strlen(guess_seq) + 1;
+	if (GET__CLIENT_PLAYER_MOVE_PRO(client_message, guess_seq) == -1)
+	{
+		printf("Protocol failed\n");
+		return -1;
+	}
+	if (Send_Socket(s_client, client_message, client_mes_size) == -1)
+	{
+		printf("Send Failed\n");
+		return -1;
+	}
+	return 0;
+}
+int Handle_Server_Main_Menu(SOCKET s_client, char* server_response,
+	Player_Status play_status, char* client_message)
+{
+	int server_res_id = GET__Server_Response(s_client, server_response);
+	if (server_res_id == SERVER_MAIN_MENU_ID)
+	{
+		Choose_Next_Play();
+		play_status = GET__Play_Player_Decision();
+		if (play_status != PLAY)
+		{
+			Handle_Client_Disconnect(s_client, client_message);
+			return -1;
+		}
+		if (Handle_Client_Versus(s_client, client_message) == -1)
+		{
+			return -1;
+		}
+	}
+	else
+	{
+		printf("SERVER_MAIN_MENU_ID pro: %s id: %d\n", server_response, server_res_id);
+		return -1;
+	}
+	return 0;
+}
+
+int Connect_to_Server()
+{
+	return 0;
+}
 int GET__Server_Response(SOCKET s_client, char * server_response)
 {	
+	snprintf(server_response, MAX_PRO_LEN, "\0");
 	if (Recv_Socket(s_client, server_response) == -1)
 	{
 		printf("Recv Failed\n");
