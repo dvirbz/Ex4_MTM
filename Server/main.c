@@ -1,15 +1,16 @@
+#define _WINSOCK_DEPRECATED_NO_WARNINGS
+#ifndef WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN
+#pragma comment(lib, "Ws2_32.lib")
 #include <assert.h>
 #include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
-#define _WINSOCK_DEPRECATED_NO_WARNINGS
-#ifndef WIN32_LEAN_AND_MEAN
-#define WIN32_LEAN_AND_MEAN
-#endif
 #include <windows.h>
 #include <winsock2.h>
 #include <ws2tcpip.h>
-#pragma comment(lib, "Ws2_32.lib")
+#include "Commune.h"
+
 
 #define NUM_OF_THREADS 2
 #define ARGUMENT_NUMBER_SERVER 2
@@ -22,8 +23,13 @@
 	int protocol // protocol to be used with the socket
 	//that is specific to the indicated address family
 );*/
+
+typedef struct ThreadParams {
+	SOCKET* ClientSocket;
+}ThreadParams;
+
 HANDLE ThreadHandles[NUM_OF_THREADS];
-SOCKET ThreadInputs[NUM_OF_THREADS];
+ThreadParams ThreadInputs[NUM_OF_THREADS];
 
 int InitializeWSA()
 {
@@ -71,7 +77,7 @@ static void CleanupWorkerThreads()
 
 			if (Res == WAIT_OBJECT_0)
 			{
-				closesocket(ThreadInputs[Ind]);
+				closesocket(ThreadInputs[Ind].ClientSocket);
 				CloseHandle(ThreadHandles[Ind]);
 				ThreadHandles[Ind] = NULL;
 				break;
@@ -85,10 +91,82 @@ static void CleanupWorkerThreads()
 	}
 }
 
-/*DWORD StartThread(SOCKET* t_socket)
+DWORD StartThread(ThreadParams threadInput)
 {
+	int error_code = 0;
+	int server_message_size;
+	char* server_massage = (char*)calloc(MAX_PRO_LEN, sizeof(char));
+	char* client_response = (char*)calloc(MAX_PRO_LEN, sizeof(char));
+	char* username = (char*)calloc(MAX_NAME_LEN, sizeof(char));
+	SOCKET s_communication = *(threadInput.ClientSocket);
+	//wait for client to send client_request
+	printf("opened thread and trying to recive now\n");
+	if (Recv_Socket(s_communication, client_response) == -1)
+	{
+		printf("Recv Failed\n");
+		error_code = -1;
+		goto ExitSeq;
+	}
+	printf("trying to get username\n");
+	username = GET_username_from_massage(client_response);
+	printf("your username is: %s\n", username);
+	//Open file to write username and get other username / create file
 
-}*/
+	int response_id = GET__Response_ID(client_response);
+	//Server Approved send
+	server_message_size = strlen(SERVER_APPROVED) + strlen(END_PROTOCOL);
+	if (GET__Server_Approved_PRO(server_massage) == -1)
+	{
+		printf("Protocol failed\n");
+		error_code = -1;
+		goto ExitSeq;
+	}
+	if (Send_Socket(s_communication, server_massage, server_message_size) == -1)
+	{
+		printf("Send Failed\n");
+		error_code = -1;
+		goto ExitSeq;
+	}
+	//Server main menu
+	server_message_size = strlen(SERVER_MAIN_MENU) + strlen(END_PROTOCOL);
+	if (GET_Server_Main_Menu_PRO(server_massage) == -1)
+	{
+		printf("Protocol failed\n");
+		error_code = -1;
+		goto ExitSeq;
+	}
+	if (Send_Socket(s_communication, server_massage, server_message_size) == -1)
+	{
+		printf("Send Failed\n");
+		error_code = -1;
+		goto ExitSeq;
+	}
+
+	//if recv: DISCONNECT_CLIENT -> close socket and thread.
+	//if recv: VERSUS_CLIENT -> send: INVITE_SERVER
+	if (Recv_Socket(s_communication, client_response) == -1)
+	{
+		printf("Recv Failed\n");
+		error_code = -1;
+		goto ExitSeq;
+	}
+	response_id = GET__Response_ID(client_response);//change
+	
+ExitSeq:
+	if (closesocket(s_communication) == SOCKET_ERROR)
+	{
+		printf("Failed to close MainSocket, error %ld. Ending program\n", WSAGetLastError());
+	}
+	if (WSACleanup() == SOCKET_ERROR)
+	{
+		printf("Failed to close Winsocket, error %ld. Ending program.\n", WSAGetLastError());
+	}
+	free(server_massage);
+	free(client_response);
+	free(username);
+	return error_code;
+}
+
 int FindFirstUnusedThreadSlot()
 {
 	int Ind;
@@ -179,15 +257,15 @@ int main(int argc, char* argv[])
 
 		Ind = FindFirstUnusedThreadSlot();
 
-		if (Ind == NUM_OF_THREADS) //no slot is available
+		if (Ind == NUM_OF_THREADS) //two players already play
 		{
 			printf("No slots available for client, dropping the connection.\n");
-			closesocket(AcceptSocket); //Closing the socket, dropping the connection.
+			closesocket(AcceptSocket); //Server Denied Protocol
 		}
 		else
 		{
-			/* need to start thread
-			ThreadInputs[Ind] = AcceptSocket; 
+			// need to start thread
+			ThreadInputs[Ind].ClientSocket = AcceptSocket; 
 			ThreadHandles[Ind] = CreateThread(
 				NULL,
 				0,
@@ -196,7 +274,7 @@ int main(int argc, char* argv[])
 				0,
 				NULL
 				
-			);*/
+			);
 		}
 	}
 
@@ -215,3 +293,4 @@ ServerCleanUp:
 		printf("Failed to close Winsocket, error %ld. Ending program.\n", WSAGetLastError());
 	}
 }
+#endif
