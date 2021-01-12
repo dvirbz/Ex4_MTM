@@ -5,7 +5,8 @@
 typedef struct Lock {
 	HANDLE read_lock;//Semaphore To lock reading in case of other thread is writing
 	HANDLE write_lock;//Semaphore To lock writing in case of other thread is reading
-	HANDLE write_lock_mutex;//Prevents writing in case of other thread is writing	
+	HANDLE write_lock_mutex;//Prevents writing in case of other thread is writing
+	HANDLE write_first_mutex;
 }Lock;
 /*========================================================================*/
 /* Initialize Lock, Allocate the required memory and returns the new Lock.
@@ -50,6 +51,10 @@ BOOL Write__Lock(Lock* my_Lock, int wait_time, int number_of_threads);
    */
 BOOL Write__Lock__Mutex(Lock* my_Lock, int wait_time);
 /*========================================================================*/
+
+BOOL Write__First__Lock__Mutex(Lock* my_Lock, int wait_time);
+
+BOOL Write__First__Release__Mutex(Lock* my_Lock);
 
 /*  Input: Pointer to Lock
     Frees all resources related to the Lock

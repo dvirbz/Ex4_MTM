@@ -27,10 +27,12 @@
 	//that is specific to the indicated address family
 );*/
 
+BOOL second_thread_wrote = FALSE;
+
 typedef struct {
 	SOCKET ClientSocket;
 	int ThreadNumber;
-	HANDLE lock_file;
+	Lock* file_lock;
 }ThreadParams;
 
 typedef struct
@@ -113,7 +115,7 @@ void CleanupWorkerThreads()
 	}
 }
 
-int init_player(Player* player, char* username)
+int init_player(Player* player)
 {
 	printf("initializing player...\n");	
 	if (snprintf(player->setup, NUM_DIGITIS_GUESS, "aaaa") == 0)
@@ -124,7 +126,11 @@ int init_player(Player* player, char* username)
 	{
 		return -1;
 	}
-	player->line_size = strlen(username) + 7;
+	if (snprintf(player->username, MAX_USERNAME_LEN, "!!!!!!!!!!!!!!!!!!!!") == 0)
+	{
+		return -1;
+	}
+	player->line_size = strlen(player->username) + 7;
 	player->is_first_player = FALSE;
 	printf("usernameinit: %s\n", player->username);
 	printf("succses!\n");
@@ -135,20 +141,23 @@ int update_player(Player* player, char* player_info)
 {
 	char* username, * move_or_setup;
 	char* next = NULL;
-	username = strtok_s(player_info, ":\n", &next);
-	move_or_setup = strtok_s(NULL, ":\n", &next);	
+	username = strtok_s(player_info, ":\r", &next);
+	move_or_setup = strtok_s(NULL, ":\r", &next);	
 	if (username == NULL || move_or_setup == NULL)
 	{
+		printf("username or moveset == NULL\n");
 		return -1;
 	}	
 	if (strcmp(player->username, username) != 0)
 	{
 		if (snprintf(player->setup, NUM_DIGITIS_GUESS, "%s", move_or_setup) == 0)
 		{
+			printf("snprintf failed 1\n");
 			return -1;
 		}
 		if (snprintf(player->username, MAX_USERNAME_LEN, "%s", username) == 0)
 		{
+			printf("snprintf failed 2\n");
 			return -1;
 		}
 	}
@@ -156,6 +165,7 @@ int update_player(Player* player, char* player_info)
 	{
 		if (snprintf(player->move, NUM_DIGITIS_GUESS, "%s", move_or_setup) == 0)
 		{
+			printf("snprintf failed 3\n");
 			return -1;
 		}
 	}
@@ -191,6 +201,7 @@ int recive_client_request(SOCKET s_communication, char* client_response, Player*
 		return -1;
 	}
 	free(data);
+	player->line_size = strlen(player->username) + 7;
 	printf("rcr username: %s\n", player->username);
 	return 0;
 }
@@ -259,8 +270,18 @@ int send_setup_request(SOCKET s_communication, char* server_massage)
 	return 0;
 }
 
-int write_to_file(HANDLE gameSession, Player* player, int distance_to_move)
+int write_to_file(HANDLE gameSession, Player* player, int distance_to_move, Lock* file_lock)
 {
+	if (Write__Lock__Mutex(file_lock, 5000) == FALSE)
+	{
+		printf("write lock mutex\n");
+		return -1;
+	}
+	if (Write__Lock(file_lock, 5000, NUM_OF_THREADS) == FALSE)
+	{
+		printf("write lock\n");
+		return -1;
+	}
 	if (SetFilePointer(gameSession, distance_to_move, NULL, FILE_BEGIN) == INVALID_SET_FILE_POINTER)
 	{
 		printf("couldn't set file pointer\n");
@@ -279,31 +300,52 @@ int write_to_file(HANDLE gameSession, Player* player, int distance_to_move)
 		printf("failed to write to file\n");		
 		return -1;
 	}
+	if (Write__Release(file_lock, NUM_OF_THREADS) == FALSE)
+	{
+		printf("write release\n");
+		return -1;
+	}
+	if (Write__Release__Mutex(file_lock) == FALSE)
+	{
+		printf("write release mutex\n");
+		return -1;
+	}
 	return 0;
 }
 
-int read__line(HANDLE gameSession, Player* current_player, Player* other_player,int distance_to_move)
+int read__line(HANDLE gameSession, Player* current_player, Player* other_player, int distance_to_move, Lock* file_lock)
 {
+	if (Read__Lock(file_lock, 5000) == FALSE)
+	{
+		printf("Could't lock in 5 sec\n");
+		return -1;
+	}
 	if (SetFilePointer(gameSession, distance_to_move, NULL, FILE_BEGIN) == INVALID_SET_FILE_POINTER)
 	{
 		printf("couldn't set file pointer\n");
 		return -1;
 	}
 	char line[MAX_LINE_LEN];
-	if (ReadFile(gameSession, line, MAX_LINE_LEN, NULL, NULL) == 0)
+	if (ReadFile(gameSession, line, other_player->line_size, NULL, NULL) == 0)
 	{
 		printf("couldn't read file\n");
 		return -1;
 	}	
+	if (Read__Release(file_lock) == FALSE)
+	{
+		printf("couldn't release\n");
+		return -1;
+	}
 	if (update_player(other_player,line) == -1)
 	{
+		printf("couldn't update_player");
 		return -1;
 	}
 	return 0;
 }
 
-int versus_or_disconnect(SOCKET s_communication, HANDLE* gameSession, char* client_response,
-	char* server_massage, Player* current_player, Player* other_player)
+int versus_or_disconnect(SOCKET s_communication, HANDLE gameSession, char* client_response,
+	char* server_massage, Player* current_player, Player* other_player, Lock* file_lock)
 {
 	if (Recv_Socket(s_communication, client_response) == -1)
 	{
@@ -315,48 +357,48 @@ int versus_or_disconnect(SOCKET s_communication, HANDLE* gameSession, char* clie
 	case CLIENT_DISCONNECT_ID:
 		return CLIENT_DISCONNECT_ID;
 	case CLIENT_VERSUS_ID:
-		//MUTEX!		
+		Write__First__Lock__Mutex(file_lock, 5000);
 		current_player->is_first_player = TRUE;
-		gameSession = CreateFileA("GameSession.txt", GENERIC_ALL, 0, NULL, CREATE_NEW, FILE_ATTRIBUTE_NORMAL, NULL);
+		gameSession = CreateFileA("GameSession.txt", GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, CREATE_NEW, FILE_ATTRIBUTE_NORMAL, NULL);
 		if (gameSession == INVALID_HANDLE_VALUE)
 		{	//ready to play MUTEX!!
 			current_player->is_first_player = FALSE;
 		}
 		if (current_player->is_first_player == FALSE)
 		{
-			gameSession = CreateFileA("GameSession.txt", GENERIC_ALL, 0, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+			Write__First__Release__Mutex(file_lock);
+			gameSession = CreateFileA("GameSession.txt", GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
 			if (gameSession == INVALID_HANDLE_VALUE)
 			{
-				printf("can't open file\n");
+				printf("can't open file, last error: %d\n", GetLastError());
 				return EXIT_CODE;
 			}
-			if (read__line(gameSession, current_player, other_player, 0) != 0)
+			if (read__line(gameSession, current_player, other_player, 0, file_lock) != 0)
 			{
 				printf("failed to read line");
 				return EXIT_CODE;
 			}
-			if (write_to_file(gameSession, current_player, other_player->line_size) != 0)
+			if (write_to_file(gameSession, current_player, other_player->line_size, file_lock) != 0)
 			{
 				printf("failed to write line");
 				return EXIT_CODE;
 			}
+			second_thread_wrote = TRUE;
 
-			CloseHandle(gameSession);
 		}
 		else
 		{
-			print_player(current_player);
-			if (write_to_file(gameSession, current_player, 0) != 0)
+			if (write_to_file(gameSession, current_player, 0, file_lock) != 0)
 			{
 				printf("failed to write line");
 				return EXIT_CODE;
 			}
-			CloseHandle(gameSession);
+			Write__Release__Mutex(file_lock);
 			//wait for other thread
-			Sleep(40000);
-			gameSession = CreateFileA("GameSession.txt", GENERIC_ALL, 0, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
-			if (read__line(gameSession, current_player, other_player, current_player->line_size) != 0)
+			while (second_thread_wrote == FALSE);
+			if (read__line(gameSession, current_player, other_player, current_player->line_size, file_lock) != 0)
 			{
+				printf("couldn't read line after sleep\n");
 				return EXIT_CODE;
 			}
 		}
@@ -382,6 +424,7 @@ int versus_or_disconnect(SOCKET s_communication, HANDLE* gameSession, char* clie
 DWORD WINAPI StartThread(LPVOID lp_params)
 {
 	ThreadParams threadInput = *(ThreadParams*)lp_params;
+	Lock* file_lock = threadInput.file_lock;
 	int error_code = 0;
 	int server_message_size;
 	char* server_massage = (char*)calloc(MAX_PRO_LEN, sizeof(char));
@@ -400,14 +443,20 @@ DWORD WINAPI StartThread(LPVOID lp_params)
 		error_code = -1;
 		goto Exit_No_Free;
 	}
+	error_code = init_player(current_player);
+	if (error_code != 0)
+		goto ExitSeq;
+	error_code = init_player(other_player);
+	if (error_code != 0)
+		goto ExitSeq;
 	error_code = recive_client_request(s_communication, client_response, current_player);
 	if(error_code != 0)
 		goto ExitSeq;
 
 	printf("Your Username: %s\n", current_player->username);
-	error_code = init_player(current_player, current_player->username);
+	/*error_code = init_player(current_player, current_player->username);
 	if (error_code != 0)
-		goto ExitSeq;
+		goto ExitSeq;*/
 
 	server_message_size = strlen(SERVER_APPROVED) + strlen(END_PROTOCOL);
 	error_code = send_approved(s_communication, server_massage);
@@ -420,7 +469,7 @@ DWORD WINAPI StartThread(LPVOID lp_params)
 		goto ExitSeq;
 	
 	switch (versus_or_disconnect(s_communication, gameSession, client_response,
-		server_massage, current_player, other_player))
+		server_massage, current_player, other_player, file_lock))
 	{
 	case EXIT_CODE:
 		error_code = EXIT_CODE;
@@ -438,6 +487,7 @@ DWORD WINAPI StartThread(LPVOID lp_params)
 	}	
 
 ExitSeq:
+	printf("entered ExitSeq\n");
 	if (current_player->is_first_player == TRUE);//CloseFile
 	free(server_massage);
 	free(client_response);
@@ -489,14 +539,16 @@ int main(int argc, char* argv[])
 	int portNumber;
 	unsigned long address;
 	SOCKADDR_IN service;
-	Lock* file_lock = (Lock*)calloc(1, sizeof(Lock));
+	Lock* file_lock = New__Lock(NUM_OF_THREADS);
 	if (file_lock == NULL)
 	{
 		return -1;
 	}
+
 	portNumber = (int)strtol(argv[PORT_NUMBER_INDEX], NULL, DECIMAL_BASE);
 	if (portNumber == 0)
 	{
+		Destroy__lock(file_lock);
 		return -1;
 	}
 	printf("your port number is: %d\n", portNumber);
@@ -510,7 +562,7 @@ int main(int argc, char* argv[])
 		goto ServerCleanUp;
 	}
 
-	address = inet_addr(LOCAL_HOST_ADDRESS);
+	address = INADDR_ANY;
 	if (address == INADDR_NONE)
 	{
 		printf("The string \"%s\" cannot be converted into an ip address. ending program.\n", LOCAL_HOST_ADDRESS);
@@ -568,6 +620,7 @@ int main(int argc, char* argv[])
 			// need to start thread
 			ThreadInputs[Ind].ClientSocket = AcceptSocket;
 			ThreadInputs[Ind].ThreadNumber = Ind;
+			ThreadInputs[Ind].file_lock = file_lock;
 			ThreadHandles[Ind] = CreateThread(
 				NULL,
 				0,
@@ -589,6 +642,7 @@ CloseSocket:
 		printf("Failed to close MainSocketServer, error %ld. Ending program\n", WSAGetLastError());
 	}
 ServerCleanUp:
+	Destroy__lock(file_lock);
 	if (WSACleanup() == SOCKET_ERROR)
 	{
 		printf("Failed to close WinsocketServer, error %ld. Ending program.\n", WSAGetLastError());

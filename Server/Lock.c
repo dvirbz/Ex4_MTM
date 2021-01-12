@@ -4,7 +4,7 @@
 
 Lock* New__Lock(int number_of_threads)
 {
-	Lock* my_lock = (Lock*)malloc(sizeof(Lock));
+	Lock* my_lock = (Lock*)calloc(1, sizeof(Lock));
 	if (my_lock == NULL) {
 		printf("MEMORY_ALLOCATION_FAILED\n");
 		return NULL;
@@ -21,6 +21,10 @@ Lock* New__Lock(int number_of_threads)
 	if (my_lock->write_lock_mutex == NULL) {
 		return NULL;
 	}	
+	my_lock->write_first_mutex = CreateMutexA(NULL, FALSE, NULL);
+	if (my_lock->write_first_mutex == NULL) {
+		return NULL;
+	}
 	return my_lock;
 }
 
@@ -66,10 +70,22 @@ BOOL Write__Lock__Mutex(Lock* my_Lock, int wait_time) {
 	}		
 	return TRUE;
 }
+
 BOOL Write__Release__Mutex(Lock* my_Lock) {
 	return ReleaseMutex(my_Lock->write_lock_mutex);
 }
+BOOL Write__First__Lock__Mutex(Lock* my_Lock, int wait_time) {
+	DWORD wait_code;
+	wait_code = WaitForSingleObject(my_Lock->write_first_mutex, wait_time);
+	if (WAIT_OBJECT_0 != wait_code) {
+		return  FALSE;
+	}
+	return TRUE;
+}
 
+BOOL Write__First__Release__Mutex(Lock* my_Lock) {
+	return ReleaseMutex(my_Lock->write_first_mutex);
+}
 BOOL Destroy__lock(Lock* my_Lock)
 {
 	BOOL succeded = TRUE;
