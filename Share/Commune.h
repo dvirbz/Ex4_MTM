@@ -37,8 +37,8 @@
 typedef struct
 {
 	int bulls, cows;
-	char opp_username[MAX_USERNAME_LEN];
-	char opp_move[NUM_DIGITIS_GUESS];
+	char username[MAX_USERNAME_LEN];
+	char user_move[NUM_DIGITIS_GUESS];
 }BnC_Data;
 
 typedef enum
@@ -68,7 +68,6 @@ typedef enum
 }Client_Messages;
 
 /*Server Protocols*/
-int GET__username_from_massage(char* protocol, char* username);
 int GET__Server_Main_Menu_PRO(char* protocol);
 int GET__Server_Approved_PRO(char* protocol);
 int GET__Server_Denied_PRO(char* protocol);

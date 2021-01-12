@@ -27,7 +27,7 @@
 );*/
 
 typedef struct ThreadParams {
-	SOCKET* ClientSocket;
+	SOCKET ClientSocket;
 	int ThreadNumber;
 }ThreadParams;
 
@@ -68,7 +68,7 @@ int stringToPositiveInt(char* portNumberStr)
 	int sum = 0;
 	int i = 0;
 	int currentDigit = 0;
-	for (i; i < strlen(portNumberStr); i++)
+	for (i; i < (int)strlen(portNumberStr); i++)
 	{
 		if (portNumberStr[i] <= '9' && portNumberStr[i] >= '0')
 		{
@@ -139,12 +139,22 @@ int recive_client_request(SOCKET s_communication, char* client_response, char* u
 		return -1;
 	}
 	printf("got here2\n");
-	int retVal = GET__username_from_massage(client_response, username);
+	BnC_Data* data = GET__BnC_Data(client_response);
+	if (data == NULL)
+	{
+		return -1;
+	}
+	if (snprintf(username, MAX_USERNAME_LEN, "%s", data->username) == 0)
+	{
+		free(data);
+		return -1;
+	}
+	free(data);
 	printf("rcr username: %s\n", username);
-	return retVal;
+	return 0;
 }
 
-int send_server_approved(SOCKET* s_communication, char* server_massage, int server_message_size)
+int send_server_approved(SOCKET s_communication, char* server_massage, int server_message_size)
 {
 	if (GET__Server_Approved_PRO(server_massage) == -1)
 	{
@@ -159,7 +169,7 @@ int send_server_approved(SOCKET* s_communication, char* server_massage, int serv
 	return 0;
 }
 
-int send_main_menu(SOCKET* s_communication, char* server_massage, int server_message_size)
+int send_main_menu(SOCKET s_communication, char* server_massage, int server_message_size)
 {
 	if (GET__Server_Main_Menu_PRO(server_massage) == -1)
 	{
@@ -174,7 +184,7 @@ int send_main_menu(SOCKET* s_communication, char* server_massage, int server_mes
 	return 0;
 }
 
-int send_invite(SOCKET* s_communication, char* server_massage, int server_message_size, char* other_username)
+int send_invite(SOCKET s_communication, char* server_massage, int server_message_size, char* other_username)
 {
 	printf("sending invite...\n");
 	if (GET__Server_Invite_PRO(server_massage, other_username) == -1)
@@ -191,7 +201,7 @@ int send_invite(SOCKET* s_communication, char* server_massage, int server_messag
 	return 0;
 }
 
-int send_setup_request(SOCKET* s_communication, char* server_massage, int server_message_size)
+int send_setup_request(SOCKET s_communication, char* server_massage, int server_message_size)
 {
 	printf("sending setup...\n");
 	if (GET__Server_Setup_Request_PRO(server_massage) == -1)
@@ -277,7 +287,7 @@ int read_second_line(HANDLE* gameSession, Player* current_player, Player* other_
 	return 0;
 }
 
-int versus_or_disconnect(SOCKET* s_communication, HANDLE* gameSession, char* client_response,
+int versus_or_disconnect(SOCKET s_communication, HANDLE* gameSession, char* client_response,
 	char* server_massage, int server_message_size, int* error_code, Player* current_player, Player* other_player, BOOL* is_first_player)
 {
 	if (Recv_Socket(s_communication, client_response) == -1)
@@ -329,7 +339,7 @@ int versus_or_disconnect(SOCKET* s_communication, HANDLE* gameSession, char* cli
 		}
 		else
 		{
-			is_first_player = TRUE;
+			*is_first_player = TRUE;
 			if (write_to_file(gameSession, current_player) != 0)
 			{
 				printf("failed to write line");
@@ -379,7 +389,7 @@ DWORD WINAPI StartThread(ThreadParams threadInput)
 	char username [MAX_USERNAME_LEN];
 	char* server_massage = (char*)calloc(MAX_PRO_LEN, sizeof(char));
 	char* client_response = (char*)calloc(MAX_PRO_LEN, sizeof(char));
-	SOCKET s_communication = *(threadInput.ClientSocket);
+	SOCKET s_communication = threadInput.ClientSocket;
 	HANDLE* gameSession = NULL;
 	Player* current_player = (Player*)calloc(1, sizeof(Player));
 	Player* other_player = (Player*)calloc(1, sizeof(Player));;
@@ -411,7 +421,6 @@ DWORD WINAPI StartThread(ThreadParams threadInput)
 		error_code = -1;
 		goto ExitSeq;
 	}
-	if ()
 	return 0;
 
 ExitSeq:
@@ -471,7 +480,7 @@ int main(int argc, char* argv[])
 
 	portNumber = stringToPositiveInt(argv[PORT_NUMBER_INDEX]);
 	printf("your port number is: %d\n", portNumber);
-	
+
 	assert(InitializeWSA() == 0);
 	s_server = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
 	if (s_server == INVALID_SOCKET)
@@ -505,13 +514,13 @@ int main(int argc, char* argv[])
 		assert(FALSE);
 	}
 
-	for(Ind = 0; Ind< NUM_OF_THREADS; Ind ++)
+	for (Ind = 0; Ind < NUM_OF_THREADS; Ind++)
 	{
 		ThreadHandles[Ind] = NULL;
 	}
 	printf("Waiting for a client to connect...\n");
 
-	while(TRUE)
+	while (TRUE)
 	{
 		SOCKET AcceptSocket = accept(s_server, NULL, NULL);
 		if (AcceptSocket == INVALID_SOCKET)
@@ -541,7 +550,7 @@ int main(int argc, char* argv[])
 				&(ThreadInputs[Ind]),
 				0,
 				NULL
-				
+
 			);
 		}
 	}
@@ -551,10 +560,10 @@ int main(int argc, char* argv[])
 
 CleanThreads:
 	CleanupWorkerThreads();
-
-CloseSocket:
 	if (closesocket(s_server) == SOCKET_ERROR)
+	{
 		printf("Failed to close MainSocketServer, error %ld. Ending program\n", WSAGetLastError());
+	}
 ServerCleanUp:
 	if (WSACleanup() == SOCKET_ERROR)
 	{

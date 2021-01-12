@@ -37,37 +37,6 @@ int GET__Server_Setup_Request_PRO(char* protocol)
 		return -1;
 	return 0;
 }
-int GET__username_from_massage(char* protocol, char* username)
-{
-	if (username == NULL)
-	{
-		return -1;
-	}
-	char* message_type = (char*)calloc(MAX_PRO_LEN, sizeof(char));
-	if (message_type == NULL)
-	{
-		username = NULL;
-		return -1;
-	}
-	if (snprintf(message_type, MAX_PRO_LEN, "%s", protocol) == 0)
-	{
-		username = NULL;
-		free(message_type);
-		return -1;
-	}
-	printf("INNER message type: %s size: %d strlen: %d\n", message_type,
-		sizeof(message_type), strlen(message_type));
-	char* next = NULL;
-	strtok_s(message_type, ":", &next);
-	if (snprintf(username, MAX_PRO_LEN, "%s", strtok_s(NULL, "\n", &next)) == 0)
-	{
-		username = NULL;
-		return -1;
-	}
-	printf("EXIT message type: %s\n", username);
-	free(message_type);
-	return 0;
-}
 
 int GET__Server_Response_ID(char* protocol)
 {
@@ -300,7 +269,7 @@ BnC_Data* GET__BnC_Data(char* protocol)
 	switch (from_which_protocol)
 	{
 	case SERVER_INVITE_ID:
-		if (snprintf(data->opp_username, MAX_USERNAME_LEN, "%s", token1) == 0)
+		if (snprintf(data->username, MAX_USERNAME_LEN, "%s", token1) == 0)
 		{
 			free(data);
 			free(temp);
@@ -308,13 +277,13 @@ BnC_Data* GET__BnC_Data(char* protocol)
 		}
 		break;
 	case SERVER_WIN_ID:
-		if (snprintf(data->opp_username, MAX_USERNAME_LEN, "%s", token1) == 0)
+		if (snprintf(data->username, MAX_USERNAME_LEN, "%s", token1) == 0)
 		{
 			free(data);
 			free(temp);
 			return NULL;
 		}
-		if (snprintf(data->opp_move, NUM_DIGITIS_GUESS, "%s", token2) == 0)
+		if (snprintf(data->user_move, NUM_DIGITIS_GUESS, "%s", token2) == 0)
 		{
 			free(data);
 			free(temp);
@@ -324,13 +293,13 @@ BnC_Data* GET__BnC_Data(char* protocol)
 	case SERVER_GAME_RESULTS_ID:
 		data->bulls = (int)strtol(token1, NULL, DECIMAL_BASE);
 		data->cows = (int)strtol(token2, NULL, DECIMAL_BASE);
-		if (snprintf(data->opp_username, MAX_USERNAME_LEN, "%s", token3) == 0)
+		if (snprintf(data->username, MAX_USERNAME_LEN, "%s", token3) == 0)
 		{
 			free(data);
 			free(temp);
 			return NULL;
 		}
-		if (snprintf(data->opp_move, NUM_DIGITIS_GUESS, "%s", token4) == 0)
+		if (snprintf(data->user_move, NUM_DIGITIS_GUESS, "%s", token4) == 0)
 		{
 			free(data);
 			free(temp);
