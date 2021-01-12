@@ -19,6 +19,47 @@ int GET__Server_Approved_PRO(char* protocol)
 		return -1;
 	return 0;
 }
+int GET__Server_Main_Menu_PRO(char* protocol)
+{
+	if (snprintf(protocol, MAX_PRO_LEN, "%s%s", SERVER_MAIN_MENU, END_PROTOCOL) == 0)
+		return -1;
+	return 0;
+}
+char* GET__username_from_massage(char* protocol)
+{
+	char* exit_char = (char*)calloc(MAX_PRO_LEN, sizeof(char));
+	if (exit_char == NULL)
+	{
+		goto Exit;
+	}
+	char* message_type = (char*)calloc(MAX_PRO_LEN, sizeof(char));
+	if (message_type == NULL)
+	{
+		exit_char = NULL;
+		goto Exit;
+	}
+	if (snprintf(message_type, MAX_PRO_LEN, "%s", protocol) == 0)
+	{
+		exit_char = NULL;
+		goto Free;
+	}
+	printf("INNER message type: %s size: %d strlen: %d\n", message_type,
+		sizeof(message_type), strlen(message_type));
+	char* next = NULL;
+	strtok_s(message_type, ":", &next);
+	if (snprintf(exit_char, MAX_PRO_LEN, "%s", strtok_s(NULL, "\n", &next)) == 0)
+	{
+		free(exit_char);
+		exit_char = NULL;
+		goto Free;
+	}
+	printf("EXIT message type: %s\n", exit_char);
+
+Free:
+	free(message_type);
+Exit:
+	return exit_char;
+}
 
 int GET__Response_ID(char* protocol)
 {
@@ -29,6 +70,11 @@ int GET__Response_ID(char* protocol)
 		response_id =  -1;
 		goto Exit;
 	}	
+	char* message_type = GET__Message_Type(protocol);
+	if (message_type == NULL)
+	{
+		return -1;
+	}
 	if (strcmp(message_type, SERVER_APPROVED) == 0)
 	{
 		response_id = SERVER_APPROVED_ID;
@@ -68,7 +114,7 @@ int GET__Response_ID(char* protocol)
 	{
 		response_id = SERVER_GAME_RESULTS_ID;
 		goto Exit;
-	}	
+	}
 	if (strcmp(message_type, SERVER_WIN) == 0)
 	{
 		response_id = SERVER_WIN_ID;
@@ -89,7 +135,7 @@ Exit:
 	return response_id;
 }
 
-int GET__CLIENT_REQUEST_PRO(char * protocol,char * username)
+int GET__CLIENT_REQUEST_PRO(char* protocol, char* username)
 {
 	if (snprintf(protocol, MAX_PRO_LEN, "%s:%s%s\0", CLIENT_REQUEST, username, END_PROTOCOL) == 0)
 	{
@@ -137,7 +183,7 @@ int GET__PRO_WITH_EOP(char* protocol)
 	return 0;
 }
 char* GET__Message_Type(char* protocol)
-{	
+{
 	char* exit_char = (char*)calloc(MAX_PRO_LEN, sizeof(char));
 	if (exit_char == NULL)
 	{
@@ -153,7 +199,7 @@ char* GET__Message_Type(char* protocol)
 	{
 		exit_char = NULL;
 		goto Free;
-	}	
+	}
 	char* next = NULL;
 	if (snprintf(exit_char, MAX_PRO_LEN, "%s", strtok_s(message_type, ":\n", &next)) == 0)
 	{
@@ -174,18 +220,18 @@ BnC_Data* GET__BnC_Data(char* protocol)
 	{
 		return NULL;
 	}
-	char* message_type, *token1, *token2, *token3, *token4;
+	char* message_type, * token1, * token2, * token3, * token4;
 	char* temp = (char*)calloc(MAX_PRO_LEN, sizeof(char));
 	if (temp == NULL)
 	{
 		return NULL;
-	}	
+	}
 	if (snprintf(temp, MAX_PRO_LEN, "%s", protocol) == 0)
 	{
 		return NULL;
 	}
 	char* next = NULL;
-	message_type = strtok_s(temp, ":;\n",&next);
+	message_type = strtok_s(temp, ":;\n", &next);
 	token1 = strtok_s(NULL, ":;\n", &next);
 	token2 = strtok_s(NULL, ":;\n", &next);
 	token3 = strtok_s(NULL, ":;\n", &next);
@@ -203,7 +249,7 @@ BnC_Data* GET__BnC_Data(char* protocol)
 		else
 		{
 			from_which_protocol = SERVER_WIN_ID;
-		}	
+		}
 	}
 	else
 	{
@@ -300,7 +346,7 @@ int ReceiveBuffer(SOCKET sd, char* OutputBuffer, int BytesToReceive)
 		else if (BytesJustTransferred == 0)
 		{
 			return 1; // recv() returns zero if connection was gracefully disconnected.
-		}		
+		}
 		RemainingBytesToReceive -= BytesJustTransferred;
 		if (*CurPlacePtr == '\n')
 		{
@@ -314,6 +360,6 @@ int ReceiveBuffer(SOCKET sd, char* OutputBuffer, int BytesToReceive)
 	return 0;
 }
 int Recv_Socket(SOCKET s, char* buffer)
-{	
+{
 	return ReceiveBuffer(s, buffer, MAX_PRO_LEN);
 }
