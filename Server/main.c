@@ -28,6 +28,7 @@
 );*/
 
 BOOL second_thread_wrote = FALSE;
+int num_of_writing = 0;
 
 typedef struct {
 	SOCKET ClientSocket;
@@ -255,7 +256,6 @@ int send_invite(SOCKET s_communication, char* server_massage, char* other_userna
 
 int send_setup_request(SOCKET s_communication, char* server_massage)
 {
-	printf("sending setup...\n");
 	if (GET__Server_Setup_Request_PRO(server_massage) == -1)
 	{
 		printf("Protocol failed\n");
@@ -266,7 +266,21 @@ int send_setup_request(SOCKET s_communication, char* server_massage)
 		printf("Send Failed\n");
 		return -1;
 	}
-	printf("setup sent!\n");
+	return 0;
+}
+
+int send_move_request(SOCKET s_communication, char* server_massage)
+{
+	if (GET__Server_Move_Request_PRO(server_massage) == -1)
+	{
+		printf("Protocol failed\n");
+		return -1;
+	}
+	if (Send_Socket(s_communication, server_massage, strlen(server_massage)) == -1)
+	{
+		printf("Send Failed\n");
+		return -1;
+	}
 	return 0;
 }
 
@@ -279,11 +293,14 @@ int write_to_file(HANDLE gameSession, Player* player, int distance_to_move, Lock
 	}
 	if (Write__Lock(file_lock, 5000, NUM_OF_THREADS) == FALSE)
 	{
+		Write__Release__Mutex(file_lock);
 		printf("write lock\n");
 		return -1;
 	}
 	if (SetFilePointer(gameSession, distance_to_move, NULL, FILE_BEGIN) == INVALID_SET_FILE_POINTER)
 	{
+		Write__Release(file_lock, NUM_OF_THREADS);
+		Write__Release__Mutex(file_lock);
 		printf("couldn't set file pointer\n");
 		return -1;
 	}
@@ -292,16 +309,21 @@ int write_to_file(HANDLE gameSession, Player* player, int distance_to_move, Lock
 		player->username, player->setup);
 	if (character_count == 0)
 	{
+		Write__Release(file_lock, NUM_OF_THREADS);
+		Write__Release__Mutex(file_lock);
 		printf("couldn't write string\n");		
 		return -1;
 	}
 	if (WriteFile(gameSession, line_to_write, strlen(line_to_write), NULL, NULL) == 0)
 	{
+		Write__Release(file_lock, NUM_OF_THREADS);
+		Write__Release__Mutex(file_lock);
 		printf("failed to write to file\n");		
 		return -1;
 	}
 	if (Write__Release(file_lock, NUM_OF_THREADS) == FALSE)
 	{
+		Write__Release__Mutex(file_lock);
 		printf("write release\n");
 		return -1;
 	}
@@ -390,6 +412,7 @@ int versus_or_disconnect(SOCKET s_communication, HANDLE gameSession, char* clien
 		{
 			if (write_to_file(gameSession, current_player, 0, file_lock) != 0)
 			{
+				Write__Release__Mutex(file_lock);
 				printf("failed to write line");
 				return EXIT_CODE;
 			}
@@ -409,14 +432,100 @@ int versus_or_disconnect(SOCKET s_communication, HANDLE gameSession, char* clien
 			printf("send invite failed!\n");
 			return EXIT_CODE;
 		}
-		//send SetupReq:		
-		if (send_setup_request(s_communication, server_massage) == EXIT_CODE)
-		{
-			printf("send setupReq failed!\n");
-			return EXIT_CODE;
-		}
 		break;
+	}
+	return 0;
+}
 
+int Handle_setup(SOCKET s_communication, char* client_response,
+	char* server_massage, Player* current_player)
+{
+	if (send_setup_request(s_communication, server_massage) == EXIT_CODE)
+	{
+		printf("send setupReq failed!\n");
+		return EXIT_CODE;
+	}
+
+	if (Recv_Socket(s_communication, client_response) == -1)
+	{
+		printf("Recv Failed\n");
+		return -1;
+	}
+
+	if (GET__Client_Response_ID(client_response) != CLIENT_SETUP_ID)
+	{
+		printf("didn't get setup id, got: %s\n", client_response);
+		return -1;
+	}
+
+	BnC_Data* data = GET__BnC_Data(client_response);
+	if (data == NULL)
+	{
+		printf("can't get BnCdata, got: %s\n", client_response);
+		return -1;
+	}
+
+	if (snprintf(current_player->setup, NUM_DIGITIS_GUESS, "%s", data->first_string) == 0)
+	{
+		printf("can't snprintf\n");
+		return -1;
+	}
+	free(data);
+	return 0;
+}
+
+int Handle_move(SOCKET s_communication, char* client_response,
+	char* server_massage, Player* current_player, Player* other_player, HANDLE gameSession, Lock* file_lock)
+{
+	if (send_move_request(s_communication, server_massage) == EXIT_CODE)
+	{
+		printf("send setupReq failed!\n");
+		return EXIT_CODE;
+	}
+
+	if (Recv_Socket(s_communication, client_response) == -1)
+	{
+		printf("Recv Failed\n");
+		return -1;
+	}
+
+	if (GET__Client_Response_ID(client_response) != CLIENT_PLAYER_MOVE_ID)
+	{
+		printf("didn't get player move id, got: %s\n", client_response);
+		return -1;
+	}
+
+	BnC_Data* data = GET__BnC_Data(client_response);
+	if (data == NULL)
+	{
+		printf("can't get BnCdata, got: %s\n", client_response);
+		return -1;
+	}
+
+	if (snprintf(current_player->move, NUM_DIGITIS_GUESS, "%s", data->first_string) == 0)
+	{
+		printf("can't snprintf\n");
+		return -1;
+	}
+	free(data);
+	int distance_to_move_write = 0, distance_to_move_read = current_player->line_size;
+	if (current_player->is_first_player == FALSE)
+	{
+		distance_to_move_write = other_player->line_size;
+		distance_to_move_read = 0;
+	}
+	if (write_to_file(gameSession, current_player, distance_to_move_write, file_lock) == -1)
+	{
+		printf("can't write to file\n");
+		return -1;
+	}
+	num_of_writing++;
+	while ((num_of_writing % 2) != 0);
+	
+	if (read__line(gameSession, current_player, other_player, distance_to_move_read, file_lock) == -1)
+	{
+		printf("can't read from file\n");
+		return -1;
 	}
 	return 0;
 }
@@ -427,8 +536,22 @@ DWORD WINAPI StartThread(LPVOID lp_params)
 	Lock* file_lock = threadInput.file_lock;
 	int error_code = 0;
 	int server_message_size;
+	int distance_to_move = 0;
 	char* server_massage = (char*)calloc(MAX_PRO_LEN, sizeof(char));
+	if (server_massage == NULL)
+	{
+		printf("cant malloc server massage\n");
+		error_code = -1;
+		goto Exit_No_Free;
+	}
 	char* client_response = (char*)calloc(MAX_PRO_LEN, sizeof(char));
+	if (client_response == NULL)
+	{
+		free(server_massage);
+		printf("cant malloc client response\n");
+		error_code = -1;
+		goto Exit_No_Free;
+	}
 	SOCKET s_communication = threadInput.ClientSocket;
 	HANDLE gameSession = NULL;
 	Player* current_player = (Player*)calloc(1, sizeof(Player));
@@ -454,9 +577,6 @@ DWORD WINAPI StartThread(LPVOID lp_params)
 		goto ExitSeq;
 
 	printf("Your Username: %s\n", current_player->username);
-	/*error_code = init_player(current_player, current_player->username);
-	if (error_code != 0)
-		goto ExitSeq;*/
 
 	server_message_size = strlen(SERVER_APPROVED) + strlen(END_PROTOCOL);
 	error_code = send_approved(s_communication, server_massage);
@@ -479,12 +599,20 @@ DWORD WINAPI StartThread(LPVOID lp_params)
 		goto ExitSeq;
 	}	
 	
-	if (Recv_Socket(s_communication, client_response) == -1)
+	if (Handle_setup(s_communication, client_response, server_massage, current_player) == -1)
 	{
-		printf("Recv Failed\n");
+		printf("can't handle setup\n");
 		error_code = -1;
 		goto ExitSeq;
-	}	
+	}
+
+	if (Handle_move(s_communication, client_response, server_massage,
+		current_player, other_player, gameSession, file_lock) == -1)
+	{
+		printf("can't handle setup\n");
+		error_code = -1;
+		goto ExitSeq;
+	}
 
 ExitSeq:
 	printf("entered ExitSeq\n");
@@ -502,6 +630,7 @@ Exit_No_Free:
 	{
 		CloseHandle(gameSession);
 	}
+	printf("player quit\n");
 	return error_code;
 }
 

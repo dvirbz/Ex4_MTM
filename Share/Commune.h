@@ -73,6 +73,7 @@ int GET__Server_Approved_PRO(char* protocol);
 int GET__Server_Denied_PRO(char* protocol);
 int GET__Server_Invite_PRO(char* protocol, char* username);
 int GET__Server_Setup_Request_PRO(char* protocol);
+int GET__Server_Move_Request_PRO(char* protocol);
 
 
 /*Client Protocols*/

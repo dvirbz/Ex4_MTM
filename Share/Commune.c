@@ -37,6 +37,12 @@ int GET__Server_Setup_Request_PRO(char* protocol)
 		return -1;
 	return 0;
 }
+int GET__Server_Move_Request_PRO(char* protocol)
+{
+	if (snprintf(protocol, MAX_PRO_LEN, "%s%s", SERVER_PLAYER_MOVE_REQUEST, END_PROTOCOL) == 0)
+		return -1;
+	return 0;
+}
 
 int GET__Server_Response_ID(char* protocol)
 {
