@@ -10,6 +10,7 @@
 #include <winsock2.h>
 #include <ws2tcpip.h>
 #include "Commune.h"
+#include "Lock.h"
 #include <stdbool.h>
 
 #define NUM_OF_THREADS 2
@@ -29,6 +30,7 @@
 typedef struct ThreadParams {
 	SOCKET ClientSocket;
 	int ThreadNumber;
+	HANDLE lock_file;
 }ThreadParams;
 
 typedef struct Player
@@ -218,10 +220,10 @@ int send_setup_request(SOCKET s_communication, char* server_massage, int server_
 	return 0;
 }
 
-int write_to_file(HANDLE* gameSession, Player* player)
+int write_to_file(HANDLE gameSession, Player* player)
 {
 	char line_to_write[MAX_LINE_LEN];
-	int character_count = snprintf(line_to_write, player->line_size, "%s:%c%c%c%c\r\n",
+	int character_count = snprintf(line_to_write, player->line_size, "%s:%c%c%c%c\r\n\0",
 		player->username, player->first_letter, player->second_letter, player->third_letter, player->forth_letter);
 	if (character_count == 0)
 	{
@@ -238,7 +240,7 @@ int write_to_file(HANDLE* gameSession, Player* player)
 	return 0;
 }
 
-int read_first_line(HANDLE* gameSession, Player* current_player, Player* other_player)
+int read_first_line(HANDLE gameSession, Player* current_player, Player* other_player)
 {
 	char first_line[MAX_LINE_LEN];
 	if (ReadFile(gameSession, first_line, MAX_LINE_LEN, NULL, NULL) == 0)
@@ -260,7 +262,7 @@ int read_first_line(HANDLE* gameSession, Player* current_player, Player* other_p
 	return 0;
 }
 
-int read_second_line(HANDLE* gameSession, Player* current_player, Player* other_player)
+int read_second_line(HANDLE gameSession, Player* current_player, Player* other_player)
 {
 	if (SetFilePointer(gameSession, current_player->line_size, NULL, FILE_BEGIN) == INVALID_SET_FILE_POINTER)
 	{
@@ -382,15 +384,16 @@ int versus_or_disconnect(SOCKET s_communication, HANDLE* gameSession, char* clie
 	return 0;
 }
 
-DWORD WINAPI StartThread(ThreadParams threadInput)
+DWORD WINAPI StartThread(LPVOID lp_params)
 {
+	ThreadParams threadInput = *(ThreadParams*)lp_params;
 	int error_code = 0;
 	int server_message_size;
-	char username [MAX_USERNAME_LEN];
+	char username[MAX_USERNAME_LEN];
 	char* server_massage = (char*)calloc(MAX_PRO_LEN, sizeof(char));
 	char* client_response = (char*)calloc(MAX_PRO_LEN, sizeof(char));
 	SOCKET s_communication = threadInput.ClientSocket;
-	HANDLE* gameSession = NULL;
+	HANDLE gameSession = NULL;
 	Player* current_player = (Player*)calloc(1, sizeof(Player));
 	Player* other_player = (Player*)calloc(1, sizeof(Player));;
 	BOOL is_first_player = FALSE;

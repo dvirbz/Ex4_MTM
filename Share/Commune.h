@@ -7,7 +7,7 @@
 #pragma comment(lib,"ws2_32.lib")
 
 #define MAX_USERNAME_LEN 20
-#define MAX_LINE_LEN 27
+#define MAX_LINE_LEN 28
 #define NUM_DIGITIS_GUESS (int)5
 #define DECIMAL_BASE 10
 
