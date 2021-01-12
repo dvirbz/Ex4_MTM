@@ -25,55 +25,58 @@ int GET__Server_Main_Menu_PRO(char* protocol)
 		return -1;
 	return 0;
 }
-char* GET__username_from_massage(char* protocol)
+int GET__Server_Invite_PRO(char* protocol, char* username)
 {
-	char* exit_char = (char*)calloc(MAX_PRO_LEN, sizeof(char));
-	if (exit_char == NULL)
+	if (snprintf(protocol, MAX_PRO_LEN, "%s%s%s%s", SERVER_INVITE, PARTITION_MASSAGE_PARAMETERS, username, END_PROTOCOL) == 0)
+		return -1;
+	return 0;
+}
+int GET__Server_Setup_Request_PRO(char* protocol)
+{
+	if (snprintf(protocol, MAX_PRO_LEN, "%s%s", SERVER_SETUP_REQUEST, END_PROTOCOL) == 0)
+		return -1;
+	return 0;
+}
+int GET__username_from_massage(char* protocol, char* username)
+{
+	if (username == NULL)
 	{
-		goto Exit;
+		return -1;
 	}
 	char* message_type = (char*)calloc(MAX_PRO_LEN, sizeof(char));
 	if (message_type == NULL)
 	{
-		exit_char = NULL;
-		goto Exit;
+		username = NULL;
+		return -1;
 	}
 	if (snprintf(message_type, MAX_PRO_LEN, "%s", protocol) == 0)
 	{
-		exit_char = NULL;
-		goto Free;
+		username = NULL;
+		free(message_type);
+		return -1;
 	}
 	printf("INNER message type: %s size: %d strlen: %d\n", message_type,
 		sizeof(message_type), strlen(message_type));
 	char* next = NULL;
 	strtok_s(message_type, ":", &next);
-	if (snprintf(exit_char, MAX_PRO_LEN, "%s", strtok_s(NULL, "\n", &next)) == 0)
+	if (snprintf(username, MAX_PRO_LEN, "%s", strtok_s(NULL, "\n", &next)) == 0)
 	{
-		free(exit_char);
-		exit_char = NULL;
-		goto Free;
+		username = NULL;
+		return -1;
 	}
-	printf("EXIT message type: %s\n", exit_char);
-
-Free:
+	printf("EXIT message type: %s\n", username);
 	free(message_type);
-Exit:
-	return exit_char;
+	return 0;
 }
 
-int GET__Response_ID(char* protocol)
+int GET__Server_Response_ID(char* protocol)
 {
 	int response_id = -1;
-	char* message_type = GET__Message_Type(protocol);	
-	if (message_type == NULL)
-	{
-		response_id =  -1;
-		goto Exit;
-	}	
 	char* message_type = GET__Message_Type(protocol);
 	if (message_type == NULL)
 	{
-		return -1;
+		response_id = -1;
+		goto Exit;
 	}
 	if (strcmp(message_type, SERVER_APPROVED) == 0)
 	{
@@ -130,6 +133,45 @@ int GET__Response_ID(char* protocol)
 		response_id = SERVER_OPPONENT_QUIT_ID;
 		goto Exit;
 	}
+Exit:
+	free(message_type);
+	return response_id;
+}
+int GET__Client_Response_ID(char* protocol)
+{
+	int response_id = -1;
+	char* message_type = GET__Message_Type(protocol);
+	if (message_type == NULL)
+	{
+		response_id = -1;
+		goto Exit;
+	}
+	if (strcmp(message_type, CLIENT_REQUEST) == 0)
+	{
+		response_id = CLIENT_REQUEST_ID;
+		goto Exit;
+	}
+	if (strcmp(message_type, CLIENT_VERSUS) == 0)
+	{
+		response_id = CLIENT_VERSUS_ID;
+		goto Exit;
+	}
+	if (strcmp(message_type, CLIENT_DISCONNECT) == 0)
+	{
+		response_id = CLIENT_DISCONNECT_ID;
+		goto Exit;
+	}
+	if (strcmp(message_type, CLIENT_SETUP) == 0)
+	{
+		response_id = CLIENT_SETUP_ID;
+		goto Exit;
+	}
+	if (strcmp(message_type, CLIENT_PLAYER_MOVE) == 0)
+	{
+		response_id = CLIENT_PLAYER_MOVE_ID;
+		goto Exit;
+	}
+
 Exit:
 	free(message_type);
 	return response_id;
