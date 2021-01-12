@@ -274,12 +274,12 @@ int Game_Guess(Game_Status guess_status,SOCKET s_client, char* server_response,
 		{
 		case SERVER_GAME_RESULTS_ID:
 			printf("Bulls: %d\nCows: %d\n%s played: %s\n",
-				data->bulls, data->cows, data->opp_username, data->opp_move);
+				data->bulls, data->cows, data->username, data->user_move);
 			free(data);			
 			break;
 		case SERVER_WIN_ID:
 			printf("%s won!\nOpponent's number was %s\n",
-				data->opp_username, data->opp_move);
+				data->username, data->user_move);
 			free(data);
 			return END;
 			break;
@@ -544,7 +544,7 @@ int GET__Server_Response(SOCKET s_client, char * server_response)
 		printf("Recv Failed\n");
 		return -1;
 	}
-	return GET__Response_ID(server_response);
+	return GET__Server_Response_ID(server_response);
 }
 
 /*time_t x = time(NULL);

@@ -33,7 +33,7 @@ typedef struct ThreadParams {
 
 typedef struct Player
 {
-	char username [MAX_USERNAME_LEN];
+	char username[MAX_USERNAME_LEN];
 	char first_letter;
 	char second_letter;
 	char third_letter;
