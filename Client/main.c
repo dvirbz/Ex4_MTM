@@ -50,7 +50,7 @@ int Game_Setup(Game_Status guess_status, SOCKET s_client, char* server_response,
 int Game(Player_Status play_status, Game_Status guess_status, SOCKET s_client, char* server_response,
 	char* guess_seq, char* client_message);
 int Connect(SOCKET s_client, SOCKADDR_IN clientService, char* server_response, int server_port_number,
-	char* server_ip_address, char* username, char* guess_seq,
+	char* server_ip_address, char* first_string, char* guess_seq,
 	char* client_message, Player_Status connect_status);
 
 /* Server Related Func*/
@@ -274,12 +274,12 @@ int Game_Guess(Game_Status guess_status,SOCKET s_client, char* server_response,
 		{
 		case SERVER_GAME_RESULTS_ID:
 			printf("Bulls: %d\nCows: %d\n%s played: %s\n",
-				data->bulls, data->cows, data->username, data->user_move);
+				data->bulls, data->cows, data->first_string, data->second_string);
 			free(data);			
 			break;
 		case SERVER_WIN_ID:
 			printf("%s won!\nOpponent's number was %s\n",
-				data->username, data->user_move);
+				data->first_string, data->second_string);
 			free(data);
 			return END;
 			break;

@@ -6,9 +6,9 @@
 #include <winsock2.h>
 #pragma comment(lib,"ws2_32.lib")
 
-#define MAX_USERNAME_LEN 20
+#define MAX_USERNAME_LEN 21
 #define MAX_LINE_LEN 28
-#define NUM_DIGITIS_GUESS (int)5
+#define NUM_DIGITIS_GUESS 5
 #define DECIMAL_BASE 10
 
 #define SERVER_DENIED "SERVER_DENIED"
@@ -37,8 +37,8 @@
 typedef struct
 {
 	int bulls, cows;
-	char username[MAX_USERNAME_LEN];
-	char user_move[NUM_DIGITIS_GUESS];
+	char first_string[MAX_USERNAME_LEN];
+	char second_string[NUM_DIGITIS_GUESS];
 }BnC_Data;
 
 typedef enum

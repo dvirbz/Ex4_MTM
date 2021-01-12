@@ -269,7 +269,15 @@ BnC_Data* GET__BnC_Data(char* protocol)
 	switch (from_which_protocol)
 	{
 	case SERVER_INVITE_ID:
-		if (snprintf(data->username, MAX_USERNAME_LEN, "%s", token1) == 0)
+		data->bulls = -1;
+		data->cows = -1;
+		if (snprintf(data->first_string, MAX_USERNAME_LEN, "%s", token1) == 0)
+		{
+			free(data);
+			free(temp);
+			return NULL;
+		}
+		if (snprintf(data->second_string, NUM_DIGITIS_GUESS, " \0") == 0)
 		{
 			free(data);
 			free(temp);
@@ -277,13 +285,15 @@ BnC_Data* GET__BnC_Data(char* protocol)
 		}
 		break;
 	case SERVER_WIN_ID:
-		if (snprintf(data->username, MAX_USERNAME_LEN, "%s", token1) == 0)
+		data->bulls = -1;
+		data->cows = -1;
+		if (snprintf(data->first_string, MAX_USERNAME_LEN, "%s", token1) == 0)
 		{
 			free(data);
 			free(temp);
 			return NULL;
 		}
-		if (snprintf(data->user_move, NUM_DIGITIS_GUESS, "%s", token2) == 0)
+		if (snprintf(data->second_string, NUM_DIGITIS_GUESS, "%s", token2) == 0)
 		{
 			free(data);
 			free(temp);
@@ -293,13 +303,13 @@ BnC_Data* GET__BnC_Data(char* protocol)
 	case SERVER_GAME_RESULTS_ID:
 		data->bulls = (int)strtol(token1, NULL, DECIMAL_BASE);
 		data->cows = (int)strtol(token2, NULL, DECIMAL_BASE);
-		if (snprintf(data->username, MAX_USERNAME_LEN, "%s", token3) == 0)
+		if (snprintf(data->first_string, MAX_USERNAME_LEN, "%s", token3) == 0)
 		{
 			free(data);
 			free(temp);
 			return NULL;
 		}
-		if (snprintf(data->user_move, NUM_DIGITIS_GUESS, "%s", token4) == 0)
+		if (snprintf(data->second_string, NUM_DIGITIS_GUESS, "%s", token4) == 0)
 		{
 			free(data);
 			free(temp);
