@@ -22,56 +22,71 @@ int GET__Server_Approved_PRO(char* protocol)
 
 int GET__Response_ID(char* protocol)
 {
+	int response_id = -1;
 	char* message_type = GET__Message_Type(protocol);	
 	if (message_type == NULL)
 	{
-		return -1;
+		response_id =  -1;
+		goto Exit;
 	}	
 	if (strcmp(message_type, SERVER_APPROVED) == 0)
 	{
-		return SERVER_APPROVED_ID;
+		response_id = SERVER_APPROVED_ID;
+		goto Exit;
 	}
 	if (strcmp(message_type, SERVER_DENIED) == 0)
 	{
-		return SERVER_DENIED_ID;
+		response_id = SERVER_DENIED_ID;
+		goto Exit;
 	}
 	if (strcmp(message_type, SERVER_MAIN_MENU) == 0)
 	{
-		return SERVER_MAIN_MENU_ID;
+		response_id = SERVER_MAIN_MENU_ID;
+		goto Exit;
 	}
 	if (strcmp(message_type, SERVER_INVITE) == 0)
 	{
-		return SERVER_INVITE_ID;
+		response_id = SERVER_INVITE_ID;
+		goto Exit;
 	}
 	if (strcmp(message_type, SERVER_NO_OPPONENTS) == 0)
 	{
-		return SERVER_NO_OPPONENTS_ID;
+		response_id = SERVER_NO_OPPONENTS_ID;
+		goto Exit;
 	}
 	if (strcmp(message_type, SERVER_SETUP_REQUEST) == 0)
 	{
-		return SERVER_SETUP_REQUEST_ID;
+		response_id = SERVER_SETUP_REQUEST_ID;
+		goto Exit;
 	}
 	if (strcmp(message_type, SERVER_PLAYER_MOVE_REQUEST) == 0)
 	{
-		return SERVER_PLAYER_MOVE_REQUEST_ID;
+		response_id = SERVER_PLAYER_MOVE_REQUEST_ID;
+		goto Exit;
 	}
 	if (strcmp(message_type, SERVER_GAME_RESULTS) == 0)
 	{
-		return SERVER_GAME_RESULTS_ID;
+		response_id = SERVER_GAME_RESULTS_ID;
+		goto Exit;
 	}	
 	if (strcmp(message_type, SERVER_WIN) == 0)
 	{
-		return SERVER_WIN_ID;
+		response_id = SERVER_WIN_ID;
+		goto Exit;
 	}
 	if (strcmp(message_type, SERVER_DRAW) == 0)
 	{
-		return SERVER_DRAW_ID;
+		response_id = SERVER_DRAW_ID;
+		goto Exit;
 	}
 	if (strcmp(message_type, SERVER_OPPONENT_QUIT) == 0)
 	{
-		return SERVER_OPPONENT_QUIT_ID;
+		response_id = SERVER_OPPONENT_QUIT_ID;
+		goto Exit;
 	}
-	return -1;
+Exit:
+	free(message_type);
+	return response_id;
 }
 
 int GET__CLIENT_REQUEST_PRO(char * protocol,char * username)

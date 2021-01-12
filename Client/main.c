@@ -10,7 +10,6 @@
 #pragma comment(lib,"ws2_32.lib")
 
 #define ArgumetnNumber 4
-
 #define MAX_IP_LEN 15
 #define IP_ARG_NUM 1
 #define PORT_ARG_NUM 2
@@ -149,6 +148,7 @@ int main(int argc, char* argv[])
 	/*===============================================================================*/
 
 ExitSeq:
+	Handle_Client_Disconnect(s_client, client_message);
 	free(guess_seq);
 	free(client_message);
 	free(server_response);
@@ -285,13 +285,16 @@ int Game_Guess(Game_Status guess_status,SOCKET s_client, char* server_response,
 			break;
 		case SERVER_DRAW_ID:
 			printf("It's a tie\n");
+			free(data);
 			return END;
 			break;
 		case SERVER_OPPONENT_QUIT_ID:
 			printf("Opponent quit.\n");
+			free(data);
 			return END;
 			break;
 		default:printf("SERVER_GAME_RESULTS_ID pro: %s id: %d\n", server_response, server_res_id);
+			free(data); 
 			return -1;
 			break;
 		}
@@ -339,8 +342,7 @@ int Game(Player_Status play_status, Game_Status guess_status, SOCKET s_client, c
 		case SERVER_NO_OPPONENTS_ID:
 			play_status = MENU;
 			break;
-		default:printf("SERVER_NO_OPPONENTS_ID SERVER_INVITE_ID pro: %s id: %d\n", server_response, server_res_id);
-			Handle_Client_Disconnect(s_client, client_message);
+		default:printf("SERVER_NO_OPPONENTS_ID SERVER_INVITE_ID pro: %s id: %d\n", server_response, server_res_id);			
 			return -1;
 			break;
 		}
@@ -423,12 +425,15 @@ int Connect(SOCKET s_client, SOCKADDR_IN clientService, char* server_response,in
 		}
 	}
 ExitSeq:
+	Handle_Client_Disconnect(s_client, client_message);
 	if (closesocket(s_client) == SOCKET_ERROR)
 	{
 		printf("Failed to close MainSocket, error %ld. Ending program\n", WSAGetLastError());
 	}
 	return -1;
 }
+
+
 
 int Handle_Client_Request(SOCKET s_client, char* username, char * client_message)
 {
@@ -511,8 +516,7 @@ int Handle_Server_Main_Menu(SOCKET s_client, char* server_response,
 		Choose_Next_Play();
 		play_status = GET__Play_Player_Decision();
 		if (play_status != PLAY)
-		{
-			Handle_Client_Disconnect(s_client, client_message);
+		{			
 			return -1;
 		}
 		if (Handle_Client_Versus(s_client, client_message) == -1)
