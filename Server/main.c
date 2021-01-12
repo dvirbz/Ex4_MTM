@@ -124,16 +124,13 @@ int init_player(Player* player, char* username)
 	{
 		return -1;
 	}
-	if (snprintf(player->username, MAX_USERNAME_LEN, "!") == 0)
-	{
-		return -1;
-	}
 	player->line_size = strlen(username) + 7;
 	player->is_first_player = FALSE;
 	printf("usernameinit: %s\n", player->username);
 	printf("succses!\n");
 	return 0;
 }
+
 int update_player(Player* player, char* player_info)
 {
 	char* username, * move_or_setup;
@@ -166,7 +163,7 @@ int update_player(Player* player, char* player_info)
 	return 0;
 }
 
-int recive_client_request(SOCKET s_communication, char* client_response, char* username)
+int recive_client_request(SOCKET s_communication, char* client_response, Player* player)
 {
 	printf("got here\n");
 	if (Recv_Socket(s_communication, client_response) == -1)
@@ -187,14 +184,14 @@ int recive_client_request(SOCKET s_communication, char* client_response, char* u
 		printf("Data Failed\n");
 		return -1;
 	}
-	if (snprintf(username, MAX_USERNAME_LEN, "%s", data->first_string) == 0)
+	if (snprintf(player->username, MAX_USERNAME_LEN, "%s", data->first_string) == 0)
 	{
 		free(data);
 		printf("Copy Failed\n");
 		return -1;
 	}
 	free(data);
-	printf("rcr username: %s\n", username);
+	printf("rcr username: %s\n", player->username);
 	return 0;
 }
 
@@ -348,12 +345,15 @@ int versus_or_disconnect(SOCKET s_communication, HANDLE* gameSession, char* clie
 		}
 		else
 		{
+			print_player(current_player);
 			if (write_to_file(gameSession, current_player, 0) != 0)
 			{
 				printf("failed to write line");
 				return EXIT_CODE;
 			}
+			CloseHandle(gameSession);
 			//wait for other thread
+			Sleep(40000);
 			gameSession = CreateFileA("GameSession.txt", GENERIC_ALL, 0, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
 			if (read__line(gameSession, current_player, other_player, current_player->line_size) != 0)
 			{
@@ -384,7 +384,6 @@ DWORD WINAPI StartThread(LPVOID lp_params)
 	ThreadParams threadInput = *(ThreadParams*)lp_params;
 	int error_code = 0;
 	int server_message_size;
-	char username[MAX_USERNAME_LEN];
 	char* server_massage = (char*)calloc(MAX_PRO_LEN, sizeof(char));
 	char* client_response = (char*)calloc(MAX_PRO_LEN, sizeof(char));
 	SOCKET s_communication = threadInput.ClientSocket;
@@ -401,12 +400,12 @@ DWORD WINAPI StartThread(LPVOID lp_params)
 		error_code = -1;
 		goto Exit_No_Free;
 	}
-	error_code = recive_client_request(s_communication, client_response, username);
+	error_code = recive_client_request(s_communication, client_response, current_player);
 	if(error_code != 0)
 		goto ExitSeq;
 
-	printf("Your Username: %s\n", username);
-	error_code = init_player(current_player, username);
+	printf("Your Username: %s\n", current_player->username);
+	error_code = init_player(current_player, current_player->username);
 	if (error_code != 0)
 		goto ExitSeq;
 
