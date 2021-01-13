@@ -75,7 +75,8 @@ int GET__Server_Denied_PRO(char* protocol);
 int GET__Server_Invite_PRO(char* protocol, char* username);
 int GET__Server_Setup_Request_PRO(char* protocol);
 int GET__Server_Move_Request_PRO(char* protocol);
-
+int GET__Server_Game_Results_PRO(char* protocol, int bulls, int cows,
+	char* other_player_user, char* other_player_move);
 
 /*Client Protocols*/
 int GET__CLIENT_REQUEST_PRO(char* protocol, char* username);

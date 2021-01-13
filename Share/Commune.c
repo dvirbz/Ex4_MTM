@@ -43,6 +43,14 @@ int GET__Server_Move_Request_PRO(char* protocol)
 		return -1;
 	return 0;
 }
+int GET__Server_Game_Results_PRO(char* protocol, int bulls, int cows,
+	char* other_player_user, char* other_player_move)
+{
+	if (snprintf(protocol, MAX_PRO_LEN, "%s:%d;%d;%s;%s%s", SERVER_GAME_RESULTS, bulls, cows,
+		other_player_user, other_player_move, END_PROTOCOL) == 0)
+		return -1;
+	return 0;
+}
 
 int GET__Server_Response_ID(char* protocol)
 {
