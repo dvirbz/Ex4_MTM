@@ -353,7 +353,7 @@ int SendBuffer(SOCKET sd, const char* Buffer, int BytesToSend)
 }
 int Send_Socket(SOCKET s, const char* buffer, int len)
 {
-	return SendBuffer(s, buffer, len);
+	return SendBuffer(s, buffer, len);//?+1 for terminating zero
 }
 int ReceiveBuffer(SOCKET sd, char* OutputBuffer, int BytesToReceive)
 {
@@ -372,7 +372,7 @@ int ReceiveBuffer(SOCKET sd, char* OutputBuffer, int BytesToReceive)
 		}
 		else if (BytesJustTransferred == 0)
 		{
-			return 1; // recv() returns zero if connection was gracefully disconnected.
+			return SHUTDOWN; // recv() returns zero if connection was gracefully disconnected.
 		}
 		RemainingBytesToReceive -= BytesJustTransferred;
 		if (*CurPlacePtr == '\n')

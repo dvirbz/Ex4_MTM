@@ -7,7 +7,7 @@
 #pragma comment(lib,"ws2_32.lib")
 
 #define MAX_USERNAME_LEN 21
-#define MAX_LINE_LEN 28
+#define MAX_LINE_LEN 32
 #define NUM_DIGITIS_GUESS 5
 #define DECIMAL_BASE 10
 
@@ -33,6 +33,7 @@
 #define MAX_NAME_LEN 20
 #define END_PROTOCOL "\n"
 #define PARTITION_MASSAGE_PARAMETERS ":"
+#define SHUTDOWN -2
 
 typedef struct
 {

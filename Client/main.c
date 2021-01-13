@@ -17,6 +17,7 @@
 
 
 
+
 typedef enum 
 {
 	CONNECT,
@@ -118,37 +119,41 @@ int main(int argc, char* argv[])
 	/*===============================================================================*/
 
 	/* Connecting */
-	connect_status = Connect(s_client, clientService, server_response, server_port_number, server_ip_address,
+	exit_code = Connect(s_client, clientService, server_response, server_port_number, server_ip_address,
 		username, guess_seq, client_message, connect_status);
-	if (connect_status == -1)
-	{
-		exit_code = -1;
-		free(guess_seq);
-		free(client_message);
-		free(server_response);
-		goto Exit_WO_CLOSE;
+	if (exit_code == -1 || exit_code == SHUTDOWN)
+	{	
+		goto ExitSeq;
 	}	
+	connect_status = exit_code;
+	exit_code = 0;
 	/*===============================================================================*/
 
 	play_status = connect_status;
 	/* SERVER_MAIN_MENU*/
-	if (Handle_Server_Main_Menu(s_client, server_response, play_status, client_message) == -1)
-	{
-		exit_code = -1;
+	exit_code = Handle_Server_Main_Menu(s_client, server_response, play_status, client_message);
+	if (exit_code == -1 || exit_code == SHUTDOWN)
+	{		
 		goto ExitSeq;
 	}
 	/*===============================================================================*/
 
 	/* Let's Play */
-	if (Game(play_status, guess_status, s_client, server_response, guess_seq, client_message) == -1)
+	exit_code = Game(play_status, guess_status, s_client, server_response, guess_seq, client_message);
+	if (exit_code == -1 || exit_code == SHUTDOWN)
 	{
-		exit_code = -1;
 		goto ExitSeq;
 	}
 	/*===============================================================================*/
 
 ExitSeq:
 	Handle_Client_Disconnect(s_client, client_message);
+	/* wait until server support this gracefull disconnect too*/
+	/*shutdown(s_client, SD_SEND);
+	while (exit_code != SHUTDOWN)
+	{
+		exit_code = Recv_Socket(s_client, server_response);
+	}*/
 	free(guess_seq);
 	free(client_message);
 	free(server_response);
@@ -157,7 +162,6 @@ Exit_WO_FREE:
 	{
 		printf("Failed to close MainSocket, error %ld. Ending program\n", WSAGetLastError());
 	}
-Exit_WO_CLOSE:
 	if (WSACleanup() == SOCKET_ERROR)
 	{
 		printf("Failed to close Winsocket, error %ld. Ending program.\n", WSAGetLastError());
@@ -265,6 +269,10 @@ int Game_Guess(Game_Status guess_status,SOCKET s_client, char* server_response,
 		}
 		else
 		{
+			if (server_res_id == SHUTDOWN)
+			{
+				return SHUTDOWN;
+			}
 			printf("SERVER_PLAYER_MOVE_REQUEST_ID pro: %s server_res_id: %d\n",server_response, server_res_id);
 			return -1;
 		}
@@ -293,6 +301,9 @@ int Game_Guess(Game_Status guess_status,SOCKET s_client, char* server_response,
 			free(data);
 			return END;
 			break;
+		case SHUTDOWN:
+			free(data);
+			return SHUTDOWN;
 		default:printf("SERVER_GAME_RESULTS_ID pro: %s id: %d\n", server_response, server_res_id);
 			free(data); 
 			return -1;
@@ -322,6 +333,10 @@ int Game_Setup(Game_Status guess_status, SOCKET s_client, char* server_response,
 	}
 	else
 	{
+		if (server_res_id == SHUTDOWN)
+		{
+			return SHUTDOWN;
+		}
 		printf("SERVER_SETUP_REQUEST_ID pro: %s server_res_id: %d\n",server_response, server_res_id);
 		return -1;
 	}
@@ -342,16 +357,24 @@ int Game(Player_Status play_status, Game_Status guess_status, SOCKET s_client, c
 		case SERVER_NO_OPPONENTS_ID:
 			play_status = MENU;
 			break;
+		case SHUTDOWN:			
+			printf("SERVER_NO_OPPONENTS_ID SERVER_INVITE_ID pro: %s id: %d\n", server_response, server_res_id);
+			return SHUTDOWN;			
 		default:printf("SERVER_NO_OPPONENTS_ID SERVER_INVITE_ID pro: %s id: %d\n", server_response, server_res_id);			
 			return -1;
 			break;
 		}
 		if (guess_status == SETUP)
 		{
-			if (Game_Setup(guess_status, s_client,
-				server_response, guess_seq, client_message) == -1)
+			int retval = Game_Setup(guess_status, s_client,
+				server_response, guess_seq, client_message);
+			if (retval == -1)
 			{
 				return -1;
+			}
+			if (retval == SHUTDOWN)
+			{
+				return SHUTDOWN;
 			}
 			guess_status = GUESS;
 		}
@@ -359,6 +382,10 @@ int Game(Player_Status play_status, Game_Status guess_status, SOCKET s_client, c
 			guess_seq, client_message);		
 		if (guess_status == -1)
 			return -1;
+		if (guess_status == SHUTDOWN)
+		{
+			return SHUTDOWN;
+		}
 		if (play_status == MENU || guess_status == END)
 		{
 			if (Handle_Server_Main_Menu(s_client, server_response, play_status, client_message) == -1)
@@ -381,7 +408,7 @@ int Connect(SOCKET s_client, SOCKADDR_IN clientService, char* server_response,in
 			connect_status = GET__Connect_Player_Decision();
 			if (connect_status != CONNECT)
 			{
-				goto ExitSeq;
+				return -1;
 			}
 			else
 			{
@@ -391,10 +418,13 @@ int Connect(SOCKET s_client, SOCKADDR_IN clientService, char* server_response,in
 		printf("Connected to server on %s:%d\n", server_ip_address, server_port_number);
 		/*===============================================================================*/
 			/* Client Request */
-		if (Handle_Client_Request(s_client, username, client_message) == -1)
+		int retval_client_request = Handle_Client_Request(s_client, username, client_message);
+		if (retval_client_request == -1 || retval_client_request == SHUTDOWN)
 		{
-			return -1;
+			printf("retval_client_request: %d\n", retval_client_request);
+			return retval_client_request;
 		}
+		
 		/* Get Server Response */
 		int server_res_id = GET__Server_Response(s_client, server_response);
 		switch (server_res_id)
@@ -403,12 +433,14 @@ int Connect(SOCKET s_client, SOCKADDR_IN clientService, char* server_response,in
 			Denied_MENU(server_ip_address, server_port_number);
 			connect_status = GET__Connect_Player_Decision();
 			if (connect_status != CONNECT)
-			{				
-				goto ExitSeq;
+			{			
+				return -1;
 			}
+			shutdown(s_client, SD_SEND);
+			while (Recv_Socket(s_client, server_response) != SHUTDOWN);			
 			if (closesocket(s_client) == SOCKET_ERROR)
 			{				
-				goto ExitSeq;
+				return -1;
 			}
 			s_client = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
 			if (s_client == INVALID_SOCKET)
@@ -419,18 +451,15 @@ int Connect(SOCKET s_client, SOCKADDR_IN clientService, char* server_response,in
 		case SERVER_APPROVED_ID:
 			return PLAY;
 			break;
+		case SHUTDOWN:
+			printf("SERVER_APPROVED_ID expected pro: %s id: %d\n", server_response, server_res_id);
+			return SHUTDOWN;
 		default:printf("SERVER_APPROVED_ID pro: %s id: %d\n", server_response, server_res_id);
-			goto ExitSeq;
+			return -1;
 			break;
 		}
 	}
-ExitSeq:
-	Handle_Client_Disconnect(s_client, client_message);
-	if (closesocket(s_client) == SOCKET_ERROR)
-	{
-		printf("Failed to close MainSocket, error %ld. Ending program\n", WSAGetLastError());
-	}
-	return -1;
+	return 0;
 }
 
 
@@ -527,6 +556,10 @@ int Handle_Server_Main_Menu(SOCKET s_client, char* server_response,
 	else
 	{
 		printf("SERVER_MAIN_MENU_ID pro: %s id: %d\n", server_response, server_res_id);
+		if (server_res_id == SHUTDOWN)
+		{			
+			return SHUTDOWN;
+		}
 		return -1;
 	}
 	return 0;
@@ -539,10 +572,16 @@ int Connect_to_Server()
 int GET__Server_Response(SOCKET s_client, char * server_response)
 {	
 	snprintf(server_response, MAX_PRO_LEN, "\0");
-	if (Recv_Socket(s_client, server_response) == -1)
+	int retval = Recv_Socket(s_client, server_response);
+	if (retval == -1)
 	{
 		printf("Recv Failed\n");
 		return -1;
+	}
+	if (retval == SHUTDOWN)
+	{
+		printf("Gracefull disconnect started\n");
+		return SHUTDOWN;
 	}
 	return GET__Server_Response_ID(server_response);
 }
