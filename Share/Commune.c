@@ -51,6 +51,18 @@ int GET__Server_Game_Results_PRO(char* protocol, int bulls, int cows,
 		return -1;
 	return 0;
 }
+int GET__Server_Won_PRO(char* protocol,	char* wining_player_username, char* other_player_setup)
+{
+	if (snprintf(protocol, MAX_PRO_LEN, "%s:%s;%s%s", SERVER_WIN, wining_player_username, other_player_setup, END_PROTOCOL) == 0)
+		return -1;
+	return 0;
+}
+int GET__Server_Draw_PRO(char* protocol)
+{
+	if (snprintf(protocol, MAX_PRO_LEN, "%s%s", SERVER_DRAW, END_PROTOCOL) == 0)
+		return -1;
+	return 0;
+}
 
 int GET__Server_Response_ID(char* protocol)
 {
