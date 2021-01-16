@@ -233,7 +233,7 @@ int recive_client_request(SOCKET s_communication, char* client_response, Player*
 
 int send_approved(SOCKET s_communication, char* server_massage)
 {
-	if (GET__Server_Approved_PRO(server_massage) == -1)
+	if (GET__Server_Pro(server_massage,SERVER_APPROVED) == -1)
 	{
 		printf("Protocol failed\n");
 		return -1;
@@ -248,7 +248,7 @@ int send_approved(SOCKET s_communication, char* server_massage)
 
 int send_main_menu(SOCKET s_communication, char* server_massage)
 {
-	if (GET__Server_Main_Menu_PRO(server_massage) == -1)
+	if (GET__Server_Pro(server_massage,SERVER_MAIN_MENU) == -1)
 	{
 		printf("Protocol failed\n");
 		return -1;
@@ -264,7 +264,7 @@ int send_main_menu(SOCKET s_communication, char* server_massage)
 int send_invite(SOCKET s_communication, char* server_massage, char* other_username)
 {	
 	printf("sending invite...\n");
-	if (GET__Server_Invite_PRO(server_massage, other_username) == -1)
+	if (GET__Server_Invite_Pro(server_massage, other_username) == -1)
 	{
 		printf("Protocol failed\n");
 		return -1;
@@ -280,7 +280,7 @@ int send_invite(SOCKET s_communication, char* server_massage, char* other_userna
 
 int send_setup_request(SOCKET s_communication, char* server_massage)
 {
-	if (GET__Server_Setup_Request_PRO(server_massage) == -1)
+	if (GET__Server_Pro(server_massage,SERVER_SETUP_REQUEST) == -1)
 	{
 		printf("Protocol failed\n");
 		return -1;
@@ -295,7 +295,7 @@ int send_setup_request(SOCKET s_communication, char* server_massage)
 
 int send_move_request(SOCKET s_communication, char* server_massage)
 {
-	if (GET__Server_Move_Request_PRO(server_massage) == -1)
+	if (GET__Server_Pro(server_massage,SERVER_PLAYER_MOVE_REQUEST) == -1)
 	{
 		printf("Protocol failed\n");
 		return -1;
@@ -311,7 +311,7 @@ int send_move_request(SOCKET s_communication, char* server_massage)
 int send_game_results(SOCKET s_communication, char* server_massage,
 	Player* other_player, Player* current_player)
 {
-	if (GET__Server_Game_Results_PRO(server_massage,current_player->bulls,current_player->cows,
+	if (GET__Server_Game_Results_Pro(server_massage,current_player->bulls,current_player->cows,
 	other_player->username,other_player->move) == -1)
 	{
 		printf("Protocol failed\n");
@@ -328,7 +328,7 @@ int send_game_results(SOCKET s_communication, char* server_massage,
 int send_game_won(SOCKET s_communication, char* server_massage,
 	Player* other_player, Player* current_player)
 {
-	if (GET__Server_Won_PRO(server_massage, current_player->username, other_player->setup) == -1)
+	if (GET__Server_Won_Pro(server_massage, current_player->username, other_player->setup) == -1)
 	{
 		printf("Protocol failed\n");
 		return -1;
@@ -344,7 +344,7 @@ int send_game_won(SOCKET s_communication, char* server_massage,
 int send_game_draw(SOCKET s_communication, char* server_massage,
 	Player* other_player, Player* current_player)
 {
-	if (GET__Server_Draw_PRO(server_massage) == -1)
+	if (GET__Server_Pro(server_massage,SERVER_DRAW) == -1)
 	{
 		printf("Protocol failed\n");
 		return -1;
