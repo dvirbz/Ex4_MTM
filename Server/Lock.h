@@ -1,6 +1,7 @@
 #ifndef LOCK_H
 #define LOCK_H
 #include <Windows.h>
+#include "HardCodedData.h"
 
 typedef struct Lock {
 	HANDLE read_lock;//Semaphore To lock reading in case of other thread is writing

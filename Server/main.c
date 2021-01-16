@@ -14,12 +14,9 @@
 #include "Player.h"
 #include "File_Func.h"
 #include "Server_send_recv.h"
+#include "HardCodedData.h"
 #include <stdbool.h>
 
-#define ARGUMENT_NUMBER_SERVER 2
-#define PORT_NUMBER_INDEX 1
-#define LOCAL_HOST_ADDRESS "127.0.0.1"
-#define FILE_GAME_SESSION "GameSession.txt"
 
 /*Thread structer and global param*/
 typedef struct {

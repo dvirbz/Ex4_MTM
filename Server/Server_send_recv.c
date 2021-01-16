@@ -300,87 +300,20 @@ int versus_or_disconnect(SOCKET s_communication, HANDLE* gameSession, char* clie
 		FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, CREATE_NEW, FILE_ATTRIBUTE_NORMAL, NULL);
 	if (*gameSession == INVALID_HANDLE_VALUE)
 	{
-		if (*gameSession == INVALID_HANDLE_VALUE || *gameSession == NULL)
+		if (second_player_versus(gameSession, current_player, other_player, file_lock) == ERROR_CODE)
 		{
-			*gameSession = CreateFileA(FILE_GAME_SESSION, GENERIC_READ | GENERIC_WRITE,
-				FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
-		}
-		if (*gameSession == INVALID_HANDLE_VALUE)
-		{
-			printf("can't open file, last error: %d\n", GetLastError());
-			return ERROR_CODE;
-		}
-		current_player->is_first_player = FALSE;
-		other_player->is_first_player = TRUE;
-		if (read__line(*gameSession, current_player, other_player, file_lock) != 0)
-		{
-			printf("failed to read line\n");
-			return ERROR_CODE;
-		}
-		if (write_to_file(*gameSession, current_player, other_player, file_lock) != 0)
-		{
-			printf("failed to write line\n");
-			return ERROR_CODE;
-		}
-		if (Write__First__Release__Mutex(file_lock) == FALSE)
-		{
-			printf("Coulden't release lock\n");
-			return ERROR_CODE;
-		}
-		printf("num_of_writings: %d\n", num_of_writing);
-		num_of_writing++;
-		if (!SetEvent(readAndWriteEvent))
-		{
-			printf("SetEvent failed (%d)\n", GetLastError());
 			return ERROR_CODE;
 		}
 	}
 	else
 	{
 		// we are first
-		current_player->is_first_player = TRUE;
-		other_player->is_first_player = FALSE;
-		printf("Im the first player\n");
-		if (write_to_file(*gameSession, current_player, other_player, file_lock) != 0)
+		if (first_player_versus(s_communication, server_massage,
+			*gameSession, current_player, other_player, file_lock) == ERROR_CODE)
 		{
-			printf("failed to write line\n");
-			if (Write__First__Release__Mutex(file_lock) == FALSE)
-			{
-				printf("Coulden't release lock\n");
-				return ERROR_CODE;
-			}
 			return ERROR_CODE;
 		}
-		if (Write__First__Release__Mutex(file_lock) == FALSE)
-		{
-			printf("Coulden't release lock\n");
-			return ERROR_CODE;
-		}
-		DWORD WaitResult;
-		WaitResult = WaitForSingleObject(
-			readAndWriteEvent,
-			TEN_MINUTES);
-		switch (WaitResult)
-		{
-		case WAIT_OBJECT_0:
-			break;
-		case WAIT_FAILED:
-			return ERROR_CODE;
-			break;
-		case WAIT_TIMEOUT:
-			if (send_server_no_opponents(s_communication, server_massage) == ERROR_CODE)
-			{
-				printf("couldn't send server no opponents\n");
-				return ERROR_CODE;
-			}
-			printf("waited too long for other opponent to write\n");
-			return SERVER_NO_OPPONENTS_ID;
-		}
-		if (read__line(*gameSession, current_player, other_player, file_lock) != 0)
-		{
-			printf("couldn't read line after sleep\n");
-			return ERROR_CODE;
-		}
+		
 	}
 	print_player(current_player);
 	print_player(other_player);
@@ -420,6 +353,108 @@ int versus_or_disconnect(SOCKET s_communication, HANDLE* gameSession, char* clie
 	return 0;
 }
 
+int first_player_versus(SOCKET s_communication, char* server_massage, 
+	HANDLE gameSession, Player* current_player, Player* other_player, Lock* file_lock)
+{
+	current_player->is_first_player = TRUE;
+	other_player->is_first_player = FALSE;
+	printf("Im the first player\n");
+	if (write_to_file(gameSession, current_player, other_player, file_lock) != 0)
+	{
+		printf("failed to write line\n");
+		if (Write__First__Release__Mutex(file_lock) == FALSE)
+		{
+			printf("Coulden't release lock\n");
+			goto ReleaseMutex;
+		}
+		return ERROR_CODE;
+	}
+	if (Write__First__Release__Mutex(file_lock) == FALSE)
+	{
+		printf("Coulden't release lock\n");
+		return ERROR_CODE;
+	}
+	DWORD WaitResult;
+	WaitResult = WaitForSingleObject(
+		readAndWriteEvent,
+		TEN_MINUTES);
+	switch (WaitResult)
+	{
+	case WAIT_OBJECT_0:
+		break;
+	case WAIT_FAILED:
+		return ERROR_CODE;
+		break;
+	case WAIT_TIMEOUT:
+		if (send_server_no_opponents(s_communication, server_massage) == ERROR_CODE)
+		{
+			printf("couldn't send server no opponents\n");
+			return ERROR_CODE;
+		}
+		printf("waited too long for other opponent to write\n");
+		return SERVER_NO_OPPONENTS_ID;
+	}
+	if (read__line(gameSession, current_player, other_player, file_lock) != 0)
+	{
+		printf("couldn't read line after sleep\n");
+		return ERROR_CODE;
+	}
+	return 0;
+
+ReleaseMutex:
+	if (Write__First__Release__Mutex(file_lock) == FALSE)
+	{
+		printf("Coulden't release lock\n");
+		return ERROR_CODE;
+	}
+	return ERROR_CODE;
+}
+int second_player_versus(HANDLE* gameSession, Player* current_player, Player* other_player, Lock* file_lock)
+{
+	if (*gameSession == INVALID_HANDLE_VALUE || *gameSession == NULL)
+	{
+		*gameSession = CreateFileA(FILE_GAME_SESSION, GENERIC_READ | GENERIC_WRITE,
+			FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+	}
+	if (*gameSession == INVALID_HANDLE_VALUE)
+	{
+		printf("can't open file, last error: %d\n", GetLastError());
+		goto ReleaseMutex;
+	}
+	current_player->is_first_player = FALSE;
+	other_player->is_first_player = TRUE;
+	if (read__line(*gameSession, current_player, other_player, file_lock) != 0)
+	{
+		printf("failed to read line\n");
+		goto ReleaseMutex;
+	}
+	if (write_to_file(*gameSession, current_player, other_player, file_lock) != 0)
+	{
+		printf("failed to write line\n");
+		goto ReleaseMutex;
+	}
+	if (Write__First__Release__Mutex(file_lock) == FALSE)
+	{
+		printf("Coulden't release lock\n");
+		return ERROR_CODE;
+	}
+	printf("num_of_writings: %d\n", num_of_writing);
+	num_of_writing++;
+	if (!SetEvent(readAndWriteEvent))
+	{
+		printf("SetEvent failed (%d)\n", GetLastError());
+		return ERROR_CODE;
+	}
+	return 0;
+
+ReleaseMutex:
+	if (Write__First__Release__Mutex(file_lock) == FALSE)
+	{
+		printf("Coulden't release lock\n");
+		return ERROR_CODE;
+	}
+	return ERROR_CODE;
+}
 BOOL no_opponents()
 {
 	for (int i = 0; i < NUM_OF_THREADS; i++)

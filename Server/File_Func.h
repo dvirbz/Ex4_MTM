@@ -4,6 +4,7 @@
 #include "Commune.h"
 #include "Server_send_recv.h"
 #include "Player.h"
+#include "HardCodedData.h"
 
 
 int write_to_file(HANDLE gameSession, Player* current_player, Player* other_player, Lock* file_lock);

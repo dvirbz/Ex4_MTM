@@ -4,7 +4,7 @@
 #include "Commune.h"
 #include "Player.h"
 #include "Lock.h"
-#define EXIT_CODE -1
+#include "HardCodedData.h"
 
 SERVER_SEND_RECV_H int num_of_writing;
 SERVER_SEND_RECV_H HANDLE ThreadHandles[NUM_OF_THREADS];

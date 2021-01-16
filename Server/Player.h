@@ -2,7 +2,7 @@
 #ifndef PLAYER_H
 #define PLAYER_H
 #include "Commune.h"
-#define BULLS_AND_COWS_STR_LEN 2
+#include "HardCodedData.h"
 
 typedef struct
 {
