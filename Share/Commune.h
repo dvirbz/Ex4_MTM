@@ -12,6 +12,9 @@
 #define MAX_LINE_LEN 32
 #define NUM_DIGITIS_GUESS 5
 #define DECIMAL_BASE 10
+#define ERROR_CODE -1
+#define TEN_MINUTES 600000
+#define FILE_GAME_SESSION "GameSession.txt"
 
 #define SERVER_DENIED "SERVER_DENIED"
 #define SERVER_APPROVED "SERVER_APPROVED"
@@ -36,6 +39,7 @@
 #define END_PROTOCOL "\n"
 #define PARTITION_MASSAGE_PARAMETERS ":"
 #define SHUTDOWN -2
+#define NUM_OF_THREADS 2
 
 typedef struct
 {
