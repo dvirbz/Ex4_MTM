@@ -7,43 +7,13 @@
 #include <winsock2.h>
 #pragma comment(lib,"ws2_32.lib")
 
-int GET__Server_Denied_PRO(char* protocol)
-{
-	if (snprintf(protocol, MAX_PRO_LEN, "%s%s", SERVER_DENIED, END_PROTOCOL) == 0)
-		return -1;
-	return 0;
-}
-int GET__Server_Approved_PRO(char* protocol)
-{
-	if (snprintf(protocol, MAX_PRO_LEN, "%s%s", SERVER_APPROVED, END_PROTOCOL) == 0)
-		return -1;
-	return 0;
-}
-int GET__Server_Main_Menu_PRO(char* protocol)
-{
-	if (snprintf(protocol, MAX_PRO_LEN, "%s%s", SERVER_MAIN_MENU, END_PROTOCOL) == 0)
-		return -1;
-	return 0;
-}
-int GET__Server_Invite_PRO(char* protocol, char* username)
+int GET__Server_Invite_Pro(char* protocol, char* username)
 {
 	if (snprintf(protocol, MAX_PRO_LEN, "%s%s%s%s", SERVER_INVITE, PARTITION_MASSAGE_PARAMETERS, username, END_PROTOCOL) == 0)
 		return -1;
 	return 0;
 }
-int GET__Server_Setup_Request_PRO(char* protocol)
-{
-	if (snprintf(protocol, MAX_PRO_LEN, "%s%s", SERVER_SETUP_REQUEST, END_PROTOCOL) == 0)
-		return -1;
-	return 0;
-}
-int GET__Server_Move_Request_PRO(char* protocol)
-{
-	if (snprintf(protocol, MAX_PRO_LEN, "%s%s", SERVER_PLAYER_MOVE_REQUEST, END_PROTOCOL) == 0)
-		return -1;
-	return 0;
-}
-int GET__Server_Game_Results_PRO(char* protocol, int bulls, int cows,
+int GET__Server_Game_Results_Pro(char* protocol, int bulls, int cows,
 	char* other_player_user, char* other_player_move)
 {
 	if (snprintf(protocol, MAX_PRO_LEN, "%s:%d;%d;%s;%s%s", SERVER_GAME_RESULTS, bulls, cows,
@@ -51,15 +21,15 @@ int GET__Server_Game_Results_PRO(char* protocol, int bulls, int cows,
 		return -1;
 	return 0;
 }
-int GET__Server_Won_PRO(char* protocol,	char* wining_player_username, char* other_player_setup)
+int GET__Server_Won_Pro(char* protocol, char* wining_player_username, char* other_player_setup)
 {
 	if (snprintf(protocol, MAX_PRO_LEN, "%s:%s;%s%s", SERVER_WIN, wining_player_username, other_player_setup, END_PROTOCOL) == 0)
 		return -1;
 	return 0;
 }
-int GET__Server_Draw_PRO(char* protocol)
+int GET__Server_Pro(char* protocol, const char* message_type)
 {
-	if (snprintf(protocol, MAX_PRO_LEN, "%s%s", SERVER_DRAW, END_PROTOCOL) == 0)
+	if (snprintf(protocol, MAX_PRO_LEN, "%s%s", message_type, END_PROTOCOL) == 0)
 		return -1;
 	return 0;
 }
