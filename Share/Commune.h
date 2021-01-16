@@ -6,6 +6,8 @@
 #include <winsock2.h>
 #pragma comment(lib,"ws2_32.lib")
 
+#include <stdio.h>
+
 #define MAX_USERNAME_LEN 21
 #define MAX_LINE_LEN 32
 #define NUM_DIGITIS_GUESS 5
@@ -69,17 +71,11 @@ typedef enum
 }Client_Messages;
 
 /*Server Protocols*/
-int GET__Server_Main_Menu_PRO(char* protocol);
-int GET__Server_Approved_PRO(char* protocol);
-int GET__Server_Denied_PRO(char* protocol);
-int GET__Server_Invite_PRO(char* protocol, char* username);
-int GET__Server_Setup_Request_PRO(char* protocol);
-int GET__Server_Move_Request_PRO(char* protocol);
-int GET__Server_Game_Results_PRO(char* protocol, int bulls, int cows,
+int GET__Server_Invite_Pro(char* protocol, char* username);
+int GET__Server_Game_Results_Pro(char* protocol, int bulls, int cows,
 	char* other_player_user, char* other_player_move);
-int GET__Server_Won_PRO(char* protocol, char* wining_player_username, char* other_player_setup);
-int GET__Server_Draw_PRO(char* protocol);
-
+int GET__Server_Won_Pro(char* protocol, char* wining_player_username, char* other_player_setup);
+int GET__Server_Pro(char* protocol, const char* message_type);
 /*Client Protocols*/
 int GET__CLIENT_REQUEST_PRO(char* protocol, char* username);
 int GET__CLIENT_VERSUS_PRO(char* protocol);
