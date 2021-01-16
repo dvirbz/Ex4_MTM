@@ -353,46 +353,61 @@ int Game(Player_Status play_status, Game_Status guess_status, SOCKET s_client, c
 		case SERVER_INVITE_ID:
 			printf("Game is on!\n");
 			guess_status = SETUP;
+			play_status = PLAY;
 			break;
 		case SERVER_NO_OPPONENTS_ID:
 			play_status = MENU;
 			break;
-		case SHUTDOWN:			
+		case SHUTDOWN:
 			printf("SERVER_NO_OPPONENTS_ID SERVER_INVITE_ID pro: %s id: %d\n", server_response, server_res_id);
-			return SHUTDOWN;			
-		default:printf("SERVER_NO_OPPONENTS_ID SERVER_INVITE_ID pro: %s id: %d\n", server_response, server_res_id);			
+			return SHUTDOWN;
+		default:printf("SERVER_NO_OPPONENTS_ID SERVER_INVITE_ID pro: %s id: %d\n", server_response, server_res_id);
 			return -1;
 			break;
 		}
-		if (guess_status == SETUP)
+		if (play_status != MENU)
 		{
-			int retval = Game_Setup(guess_status, s_client,
-				server_response, guess_seq, client_message);
-			if (retval == -1)
+			if (guess_status == SETUP)
 			{
-				return -1;
+				int retval = Game_Setup(guess_status, s_client,
+					server_response, guess_seq, client_message);
+				if (retval == -1)
+				{
+					return -1;
+				}
+				if (retval == SHUTDOWN)
+				{
+					return SHUTDOWN;
+				}
+				guess_status = GUESS;
 			}
-			if (retval == SHUTDOWN)
+
+			guess_status = Game_Guess(guess_status, s_client, server_response,
+				guess_seq, client_message);
+			if (guess_status == -1)
+				return -1;
+			if (guess_status == SHUTDOWN)
 			{
 				return SHUTDOWN;
 			}
-			guess_status = GUESS;
+			if (guess_status == END)
+			{
+				if (Handle_Server_Main_Menu(s_client, server_response, play_status, client_message) == -1)
+				{
+					return -1;
+				}
+				play_status = PLAY;
+			}
+
 		}
-		guess_status = Game_Guess(guess_status, s_client, server_response,
-			guess_seq, client_message);		
-		if (guess_status == -1)
-			return -1;
-		if (guess_status == SHUTDOWN)
-		{
-			return SHUTDOWN;
-		}
-		if (play_status == MENU || guess_status == END)
+		else
 		{
 			if (Handle_Server_Main_Menu(s_client, server_response, play_status, client_message) == -1)
 			{
 				return -1;
 			}
-		}
+			play_status = PLAY;
+		}		
 	}
 	return 0;
 }
