@@ -20,7 +20,7 @@
 #define FILE_GAME_SESSION "GameSession.txt"
 #define ERROR_CODE -1
 #define BULLS_AND_COWS_STR_LEN 2
-#define TEN_MINUTES 600000
+#define TEN_MINUTES 30000
 /*SOCKET socket(
 	int af, // address family specification
 	int type, // type specification for the new socket
@@ -68,9 +68,19 @@ BOOL no_opponents()
 	{
 		if (ThreadHandles[i] == NULL)
 		{
+			printf("we dont have oponents before waitforsingle\n");
+			return TRUE;
+		}
+		DWORD Res = WaitForSingleObject(ThreadHandles[i], 0);
+		if (Res == WAIT_OBJECT_0) // this thread finished running
+		{
+			printf("we dont have oponents after waitforsingle\n");
+			CloseHandle(ThreadHandles[i]);
+			ThreadHandles[i] = NULL;
 			return TRUE;
 		}
 	}
+	printf("returned false no_opponents\n");
 	return FALSE;
 }
 
@@ -515,14 +525,11 @@ int versus_or_disconnect(SOCKET s_communication, HANDLE* gameSession, char* clie
 		printf("client disconnected, id: %d", CLIENT_DISCONNECT_ID);
 		return CLIENT_DISCONNECT_ID;
 	}
-	//versus
-	//try to open file:
 	if (response != CLIENT_VERSUS_ID)
 	{
 		printf("didnt get expacted response from versus or disconnect, ID = %d", response);
 		return ERROR_CODE;
 	}
-	//IS there another client Wait lesemaphore haim yesh od sahkan;
 	if (no_opponents() == TRUE)
 	{
 		if (send_server_no_opponents(s_communication, server_massage) == ERROR_CODE)
@@ -537,6 +544,7 @@ int versus_or_disconnect(SOCKET s_communication, HANDLE* gameSession, char* clie
 		printf("Deadlock first write\n");
 		return ERROR_CODE;
 	}
+	printf("trying to open gameSession.txt\n");
 	*gameSession = CreateFileA(FILE_GAME_SESSION, GENERIC_READ | GENERIC_WRITE,
 		FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, CREATE_NEW, FILE_ATTRIBUTE_NORMAL, NULL);
 	if (*gameSession == INVALID_HANDLE_VALUE)
@@ -568,6 +576,7 @@ int versus_or_disconnect(SOCKET s_communication, HANDLE* gameSession, char* clie
 			printf("Coulden't release lock\n");
 			return ERROR_CODE;
 		}
+		printf("num_of_writings: %d\n", num_of_writing);
 		num_of_writing++;
 		if (!SetEvent(readAndWriteEvent))
 		{
@@ -964,6 +973,7 @@ DWORD WINAPI StartThread(LPVOID lp_params)
 			{
 				printf("error: %d\n", GetLastError());
 			}
+			num_of_writing = -1;
 		}
 		ResetEvent(readAndWriteEvent);
 		if (current_player->is_first_player == TRUE)
@@ -982,6 +992,11 @@ DWORD WINAPI StartThread(LPVOID lp_params)
 	
 
 ExitSeq:
+	if (gameSession != NULL)
+	{
+		CloseHandle(gameSession);
+		can_I_close_file++;
+	}
 	printf("entered ExitSeq\n");
 	print_player(current_player);			
 	free(server_massage);
