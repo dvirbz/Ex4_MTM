@@ -1,5 +1,5 @@
 #pragma once
-#ifndef  COMMUNE_H
+#ifndef COMMUNE_H
 #define COMMUNE_H
 
 #define _WINSOCK_DEPRECATED_NO_WARNINGS
@@ -14,6 +14,8 @@
 #define DECIMAL_BASE 10
 #define ERROR_CODE -1
 #define TEN_MINUTES 600000
+#define FIFTEEN_SEC 15000
+#define THIRTY_SEC 30000
 #define FILE_GAME_SESSION "GameSession.txt"
 
 #define SERVER_DENIED "SERVER_DENIED"
@@ -94,9 +96,9 @@ char* GET__Message_Type(char* protocol);
 BnC_Data* GET__BnC_Data(char* protocol);
 
 /*Send and recive on socket*/
-int Send_Socket(SOCKET s, const char* buffer, int len);
-int ReceiveBuffer(SOCKET sd, char* OutputBuffer, int BytesToReceive);
-int SendBuffer(SOCKET sd, const char* Buffer, int BytesToSend);
-int Recv_Socket(SOCKET s, char* buffer);
+int Send_Socket(SOCKET s, const char* buffer, int len, int max_wait_time);
+int ReceiveBuffer(SOCKET sd, char* OutputBuffer, int BytesToReceive, int max_wait_time);
+int SendBuffer(SOCKET sd, const char* Buffer, int BytesToSend, int max_wait_time);
+int Recv_Socket(SOCKET s, char* buffer, int max_wait_time);
 
 #endif // ! COMMUNE_H

@@ -15,9 +15,6 @@
 #define PORT_ARG_NUM 2
 #define USER_ARG_NUM 3
 
-
-
-
 typedef enum 
 {
 	CONNECT,
@@ -42,7 +39,6 @@ void Choose_Next_Connect();
 void Choose_Next_Play();
 void Connect_MENU(char server_ip[], int server_port);
 void Denied_MENU(char server_ip[], int server_port);
-
 
 int Game_Guess(Game_Status guess_status, SOCKET s_client,
 	char* server_response, char* guess_seq, char* client_message);
@@ -452,7 +448,7 @@ int Connect(SOCKET s_client, SOCKADDR_IN clientService, char* server_response,in
 				return -1;
 			}
 			shutdown(s_client, SD_SEND);
-			while (Recv_Socket(s_client, server_response) != SHUTDOWN);			
+			while (Recv_Socket(s_client, server_response, FIFTEEN_SEC) != SHUTDOWN);
 			if (closesocket(s_client) == SOCKET_ERROR)
 			{				
 				return -1;
@@ -487,11 +483,11 @@ int Handle_Client_Request(SOCKET s_client, char* username, char * client_message
 		printf("Protocol failed\n");		
 		return -1;
 	}
-	if (Send_Socket(s_client, client_message, client_mes_size) == -1)
+	if (Send_Socket(s_client, client_message, client_mes_size, FIFTEEN_SEC) == -1)
 	{
-		printf("Send Failed\n");		
+		printf("Send Failed\n");
 		return -1;
-	}	
+	}
 	return 0;
 }
 int Handle_Client_Disconnect(SOCKET s_client, char* client_message) {
@@ -501,7 +497,7 @@ int Handle_Client_Disconnect(SOCKET s_client, char* client_message) {
 		printf("Protocol failed\n");
 		return -1;
 	}
-	if (Send_Socket(s_client, client_message, client_mes_size) == -1)
+	if (Send_Socket(s_client, client_message, client_mes_size, FIFTEEN_SEC) == -1)
 	{
 		printf("Send Failed\n");
 		return -1;
@@ -515,7 +511,7 @@ int Handle_Client_Versus(SOCKET s_client, char* client_message) {
 		printf("Protocol failed\n");
 		return -1;
 	}
-	if (Send_Socket(s_client, client_message, client_mes_size) == -1)
+	if (Send_Socket(s_client, client_message, client_mes_size, FIFTEEN_SEC) == -1)
 	{
 		printf("Send Failed\n");
 		return -1;
@@ -529,7 +525,7 @@ int Handle_Client_Setup(SOCKET s_client, char* client_message, char* setup_seq) 
 		printf("Protocol failed\n");
 		return -1;
 	}
-	if (Send_Socket(s_client, client_message, client_mes_size) == -1)
+	if (Send_Socket(s_client, client_message, client_mes_size, FIFTEEN_SEC) == -1)
 	{
 		printf("Send Failed\n");
 		return -1;
@@ -544,7 +540,7 @@ int Handle_Client_Player_Move(SOCKET s_client, char* client_message, char* guess
 		printf("Protocol failed\n");
 		return -1;
 	}
-	if (Send_Socket(s_client, client_message, client_mes_size) == -1)
+	if (Send_Socket(s_client, client_message, client_mes_size, FIFTEEN_SEC) == -1)
 	{
 		printf("Send Failed\n");
 		return -1;
@@ -587,7 +583,7 @@ int Connect_to_Server()
 int GET__Server_Response(SOCKET s_client, char * server_response)
 {	
 	snprintf(server_response, MAX_PRO_LEN, "\0");
-	int retval = Recv_Socket(s_client, server_response);
+	int retval = Recv_Socket(s_client, server_response, FIFTEEN_SEC);
 	if (retval == -1)
 	{
 		printf("Recv Failed\n");

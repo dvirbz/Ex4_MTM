@@ -320,12 +320,16 @@ BnC_Data* GET__BnC_Data(char* protocol)
 	return data;
 }
 
-int SendBuffer(SOCKET sd, const char* Buffer, int BytesToSend)
+int SendBuffer(SOCKET sd, const char* Buffer, int BytesToSend, int max_wait_time)
 {
 	const char* CurPlacePtr = Buffer;
 	int BytesTransferred;
 	int RemainingBytesToSend = BytesToSend;
-
+	if (setsockopt(sd, SOL_SOCKET, SO_SNDTIMEO, (char*)&max_wait_time, sizeof(max_wait_time)) == SOCKET_ERROR)
+	{
+		printf("Couldn't set socket send time out, Last error: %d", GetLastError());
+		return ERROR_CODE;
+	}
 	while (RemainingBytesToSend > 0)
 	{
 		/* send does not guarantee that the entire message is sent */
@@ -333,7 +337,7 @@ int SendBuffer(SOCKET sd, const char* Buffer, int BytesToSend)
 		if (BytesTransferred == SOCKET_ERROR)
 		{
 			printf("send() failed, error %d\n", WSAGetLastError());
-			return -1;
+			return ERROR_CODE;
 		}
 		printf("Number of bytes send: %d out of total %d\n", BytesTransferred, BytesToSend);
 		RemainingBytesToSend -= BytesTransferred;
@@ -341,16 +345,20 @@ int SendBuffer(SOCKET sd, const char* Buffer, int BytesToSend)
 	}
 	return 0;
 }
-int Send_Socket(SOCKET s, const char* buffer, int len)
+int Send_Socket(SOCKET s, const char* buffer, int len, int max_wait_time)
 {
-	return SendBuffer(s, buffer, len);//?+1 for terminating zero
+	return SendBuffer(s, buffer, len,max_wait_time);//?+1 for terminating zero
 }
-int ReceiveBuffer(SOCKET sd, char* OutputBuffer, int BytesToReceive)
+int ReceiveBuffer(SOCKET sd, char* OutputBuffer, int BytesToReceive, int max_wait_time)
 {
 	char* CurPlacePtr = OutputBuffer;
 	int BytesJustTransferred;
 	int RemainingBytesToReceive = BytesToReceive;
-
+	if (setsockopt(sd, SOL_SOCKET, SO_RCVTIMEO, (char*)&max_wait_time, sizeof(max_wait_time)) == SOCKET_ERROR)
+	{
+		printf("Couldn't set socket recv time out, Last error: %d", GetLastError());
+		return ERROR_CODE;
+	}
 	while (RemainingBytesToReceive > 0)
 	{
 		/* send does not guarantee that the entire message is sent */
@@ -376,7 +384,7 @@ int ReceiveBuffer(SOCKET sd, char* OutputBuffer, int BytesToReceive)
 
 	return 0;
 }
-int Recv_Socket(SOCKET s, char* buffer)
+int Recv_Socket(SOCKET s, char* buffer, int max_wait_time)
 {
-	return ReceiveBuffer(s, buffer, MAX_PRO_LEN);
+	return ReceiveBuffer(s, buffer, MAX_PRO_LEN,max_wait_time);
 }

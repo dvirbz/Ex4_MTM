@@ -10,7 +10,7 @@ SERVER_SEND_RECV_H HANDLE readAndWriteEvent = NULL;
 int recive_client_request(SOCKET s_communication, char* client_response, Player* player)
 {
 	printf("got here\n");
-	if (Recv_Socket(s_communication, client_response) == -1)
+	if (Recv_Socket(s_communication, client_response, FIFTEEN_SEC) == -1)
 	{
 		printf("Recv Failed\n");
 		return -1;
@@ -49,7 +49,7 @@ int send_approved(SOCKET s_communication, char* server_massage)
 		printf("Protocol failed\n");
 		return -1;
 	}
-	if (Send_Socket(s_communication, server_massage, strlen(server_massage)) == -1)
+	if (Send_Socket(s_communication, server_massage, strlen(server_massage), FIFTEEN_SEC) == -1)
 	{
 		printf("Send Failed\n");
 		return -1;
@@ -63,7 +63,7 @@ int send_main_menu(SOCKET s_communication, char* server_massage)
 		printf("Protocol failed\n");
 		return -1;
 	}
-	if (Send_Socket(s_communication, server_massage, strlen(server_massage)) == -1)
+	if (Send_Socket(s_communication, server_massage, strlen(server_massage), FIFTEEN_SEC) == -1)
 	{
 		printf("Send Failed\n");
 		return -1;
@@ -78,7 +78,7 @@ int send_invite(SOCKET s_communication, char* server_massage, char* other_userna
 		printf("Protocol failed\n");
 		return -1;
 	}
-	if (Send_Socket(s_communication, server_massage, strlen(server_massage)) == -1)
+	if (Send_Socket(s_communication, server_massage, strlen(server_massage), FIFTEEN_SEC) == -1)
 	{
 		printf("Send Failed\n");
 		return -1;
@@ -93,7 +93,7 @@ int send_setup_request(SOCKET s_communication, char* server_massage)
 		printf("Protocol failed\n");
 		return -1;
 	}
-	if (Send_Socket(s_communication, server_massage, strlen(server_massage)) == -1)
+	if (Send_Socket(s_communication, server_massage, strlen(server_massage), FIFTEEN_SEC) == -1)
 	{
 		printf("Send Failed\n");
 		return -1;
@@ -107,7 +107,7 @@ int send_move_request(SOCKET s_communication, char* server_massage)
 		printf("Protocol failed\n");
 		return -1;
 	}
-	if (Send_Socket(s_communication, server_massage, strlen(server_massage)) == -1)
+	if (Send_Socket(s_communication, server_massage, strlen(server_massage), FIFTEEN_SEC) == -1)
 	{
 		printf("Send Failed\n");
 		return -1;
@@ -123,7 +123,7 @@ int send_game_results(SOCKET s_communication, char* server_massage,
 		printf("Protocol failed\n");
 		return -1;
 	}
-	if (Send_Socket(s_communication, server_massage, strlen(server_massage)) == -1)
+	if (Send_Socket(s_communication, server_massage, strlen(server_massage), FIFTEEN_SEC) == -1)
 	{
 		printf("Send Failed\n");
 		return -1;
@@ -138,7 +138,7 @@ int send_game_won(SOCKET s_communication, char* server_massage,
 		printf("Protocol failed\n");
 		return -1;
 	}
-	if (Send_Socket(s_communication, server_massage, strlen(server_massage)) == -1)
+	if (Send_Socket(s_communication, server_massage, strlen(server_massage), FIFTEEN_SEC) == -1)
 	{
 		printf("Send Failed\n");
 		return -1;
@@ -153,7 +153,7 @@ int send_game_draw(SOCKET s_communication, char* server_massage,
 		printf("Protocol failed\n");
 		return -1;
 	}
-	if (Send_Socket(s_communication, server_massage, strlen(server_massage)) == -1)
+	if (Send_Socket(s_communication, server_massage, strlen(server_massage), FIFTEEN_SEC) == -1)
 	{
 		printf("Send Failed\n");
 		return -1;
@@ -167,7 +167,7 @@ int send_server_no_opponents(SOCKET s_communication, char* server_massage)
 		printf("Protocol failed\n");
 		return -1;
 	}
-	if (Send_Socket(s_communication, server_massage, strlen(server_massage)) == -1)
+	if (Send_Socket(s_communication, server_massage, strlen(server_massage), FIFTEEN_SEC) == -1)
 	{
 		printf("Send Failed\n");
 		return -1;
@@ -185,7 +185,7 @@ int Handle_setup(SOCKET s_communication, char* client_response, char* server_mas
 		return EXIT_CODE;
 	}
 
-	if (Recv_Socket(s_communication, client_response) == -1)
+	if (Recv_Socket(s_communication, client_response, FIFTEEN_SEC) == -1)
 	{
 		printf("Recv Failed\n");
 		return -1;
@@ -230,7 +230,7 @@ int Handle_move(SOCKET s_communication, char* client_response, char* server_mass
 		return EXIT_CODE;
 	}
 
-	if (Recv_Socket(s_communication, client_response) == -1)
+	if (Recv_Socket(s_communication, client_response, FIFTEEN_SEC) == -1)
 	{
 		printf("Recv Failed\n");
 		return -1;
@@ -265,7 +265,7 @@ int Handle_move(SOCKET s_communication, char* client_response, char* server_mass
 int versus_or_disconnect(SOCKET s_communication, HANDLE* gameSession, char* client_response,
 	char* server_massage, Player* current_player, Player* other_player, Lock* file_lock)
 {
-	if (Recv_Socket(s_communication, client_response) == -1)
+	if (Recv_Socket(s_communication, client_response, FIFTEEN_SEC) == -1)
 	{
 		printf("Recv Failed\n");
 		return ERROR_CODE;
