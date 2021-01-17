@@ -148,7 +148,7 @@ ExitSeq:
 	shutdown(s_client, SD_SEND);
 	while (exit_code != SHUTDOWN)
 	{
-		exit_code = Recv_Socket(s_client, server_response, FIFTEEN_SEC);
+		exit_code = Recv_Socket(s_client, server_response,FIFTEEN_SEC);
 	}
 	free(guess_seq);
 	free(client_message);
@@ -447,8 +447,8 @@ int Connect(SOCKET s_client, SOCKADDR_IN clientService, char* server_response,in
 			{			
 				return -1;
 			}
-			/*shutdown(s_client, SD_SEND);
-			while (Recv_Socket(s_client, server_response, FIFTEEN_SEC) != SHUTDOWN);*/
+			shutdown(s_client, SD_SEND);
+			while (Recv_Socket(s_client, server_response, FIFTEEN_SEC) != SHUTDOWN);
 			if (closesocket(s_client) == SOCKET_ERROR)
 			{				
 				return -1;
@@ -472,8 +472,6 @@ int Connect(SOCKET s_client, SOCKADDR_IN clientService, char* server_response,in
 	}
 	return 0;
 }
-
-
 
 int Handle_Client_Request(SOCKET s_client, char* username, char * client_message)
 {

@@ -2,21 +2,23 @@
 #ifndef WIN32_LEAN_AND_MEAN
 #define WIN32_LEAN_AND_MEAN
 #pragma comment(lib, "Ws2_32.lib")
+
 #include <assert.h>
 #include <string.h>
 #include <stdio.h>
+#include <time.h>
+#include <errno.h>
 #include <stdlib.h>
 #include <windows.h>
 #include <winsock2.h>
 #include <ws2tcpip.h>
+
 #include "Commune.h"
 #include "Lock.h"
 #include "Player.h"
 #include "File_Func.h"
 #include "Server_send_recv.h"
 #include "HardCodedData.h"
-#include <stdbool.h>
-
 
 /*Thread structer and global param*/
 typedef struct {
@@ -26,10 +28,10 @@ typedef struct {
 	HANDLE readAndWriteEvent;
 }ThreadParams;
 
-HANDLE ThreadToBeClosed;
 ThreadParams ThreadInputs[NUM_OF_THREADS];
-ThreadParams ServerDeniedThreadInputs;
 int can_I_close_file = 0;
+HANDLE ThreadToBeClosed;
+ThreadParams ServerDeniedThreadInputs;
 
 int InitializeWSA()
 {
@@ -206,6 +208,51 @@ ExitSeq:
 	return exit_code;
 }
 
+DWORD WINAPI ServerDeniedThread(LPVOID lp_params)
+{
+	ThreadParams threadInput = *(ThreadParams*)lp_params;
+	SOCKET s_communication = threadInput.ClientSocket;
+	int exit_code = 0;
+
+	char* server_massage = (char*)calloc(MAX_PRO_LEN, sizeof(char));
+	if (server_massage == NULL)
+	{
+		printf("cant malloc server massage\n");
+		exit_code = -1;
+		goto Exit_No_Free;
+	}
+	char* client_response = (char*)calloc(MAX_PRO_LEN, sizeof(char));
+	if (client_response == NULL)
+	{
+		printf("cant malloc client response\n");
+		exit_code = -1;
+		goto ExitFreeServer;
+	}
+
+	Player* current_player = (Player*)calloc(1, sizeof(Player));
+	if (current_player == NULL)
+	{
+		printf("cant malloc current player\n");
+		exit_code = -1;
+		goto ExitFreeServerClient;
+	}
+
+	exit_code = Handle_Client_Request_Denied(s_communication, client_response, server_massage, current_player);
+	free(current_player);
+	shutdown(s_communication, SD_SEND);
+	while (Recv_Socket(s_communication, client_response, FIFTEEN_SEC) != SHUTDOWN);
+ExitFreeServerClient:
+	free(client_response);
+ExitFreeServer:
+	free(server_massage);
+Exit_No_Free:
+	if (closesocket(s_communication) == SOCKET_ERROR)
+	{
+		printf("Failed to close MainSocketThread, error %ld. Ending program\n", WSAGetLastError());
+	}
+	return exit_code;
+}
+
 DWORD WINAPI StartThread(LPVOID lp_params)
 {
 	ThreadParams threadInput = *(ThreadParams*)lp_params;
@@ -243,9 +290,9 @@ DWORD WINAPI StartThread(LPVOID lp_params)
 		exit_code = -1;
 		goto ExitFreeServerClientPlayer;
 	}
-	exit_code = init_playeres(current_player, other_player);
+	exit_code = init_playeres(current_player,other_player);
 	if (exit_code != 0)
-		goto ExitSeq;
+		goto ExitSeq;	
 
 	exit_code = Handle_Client_Request_Approved(s_communication, client_response, server_massage, current_player);
 	if (exit_code != 0)
@@ -253,7 +300,7 @@ DWORD WINAPI StartThread(LPVOID lp_params)
 	int pre_game_code = 0;
 	while (TRUE)
 	{
-	MainMenu:
+	MainMenu:		
 		exit_code = send_main_menu(s_communication, server_massage);
 		if (exit_code == ERROR_CODE)
 			goto ExitSeq;
@@ -278,26 +325,7 @@ DWORD WINAPI StartThread(LPVOID lp_params)
 			printf("can't handle setup\n");
 			exit_code = ERROR_CODE;
 			goto ExitSeq;
-		}
-		/*pre_game_code = Pre_Game(s_communication, client_response, server_massage, current_player,
-			other_player, &gameSession, file_lock);
-		switch (pre_game_code)
-		{
-		case ERROR_CODE:
-			exit_code = ERROR_CODE;
-			goto ExitSeq;
-		case RESET_GAME:
-			exit_code = ERROR_CODE;
-			goto ResetGame;
-		case CLIENT_DISCONNECT_ID:
-			exit_code = CLIENT_DISCONNECT_ID;
-			goto ExitSeq;
-		case SERVER_NO_OPPONENTS_ID:
-			exit_code = 0;
-			goto MainMenu;
-		default:
-			break;
-		}*/
+		}		
 		exit_code = Game(s_communication, client_response, server_massage, current_player,
 			other_player, gameSession, file_lock);
 	ResetGame:
@@ -330,16 +358,12 @@ DWORD WINAPI StartThread(LPVOID lp_params)
 			goto ExitSeq;
 		}
 	}
-
 ExitSeq:
 	if (gameSession != NULL)
 	{
 		CloseHandle(gameSession);
 		can_I_close_file++;
-	}
-	printf("entered ExitSeq\n");
-	print_player(current_player);
-
+	}	
 	free(other_player);
 ExitFreeServerClientPlayer:
 	free(current_player);
@@ -361,58 +385,28 @@ Exit_No_Free:
 	return exit_code;
 }
 
-DWORD WINAPI ServerDeniedThread(LPVOID lp_params)
+DWORD WINAPI ExitMainThread(char* exit_string)
 {
-	ThreadParams threadInput = *(ThreadParams*)lp_params;
-	SOCKET s_communication = threadInput.ClientSocket;
-	int exit_code = 0;
-
-	char* server_massage = (char*)calloc(MAX_PRO_LEN, sizeof(char));
-	if (server_massage == NULL)
+	printf("Start checking for exit\n");
+	while (strcmp(exit_string,"exit") != 0)
 	{
-		printf("cant malloc server massage\n");
-		exit_code = -1;
-		goto Exit_No_Free;
+		printf("%s\n", exit_string);
+		scanf_s("%s", exit_string, EXIT_STRING_LEN);	
+		printf("%s\n", exit_string);
 	}
-	char* client_response = (char*)calloc(MAX_PRO_LEN, sizeof(char));
-	if (client_response == NULL)
-	{
-		printf("cant malloc client response\n");
-		exit_code = -1;
-		goto ExitFreeServer;
-	}
-
-	Player* current_player = (Player*)calloc(1, sizeof(Player));
-	if (current_player == NULL)
-	{
-		printf("cant malloc current player\n");
-		exit_code = -1;
-		goto ExitFreeServerClient;
-	}
-
-	exit_code = Handle_Client_Request_Denied(s_communication, client_response, server_massage, current_player);
-
-ExitFreeServerClient:
-	free(client_response);
-ExitFreeServer:
-	free(server_massage);
-Exit_No_Free:
-	if (closesocket(s_communication) == SOCKET_ERROR)
-	{
-		printf("Failed to close MainSocketThread, error %ld. Ending program\n", WSAGetLastError());
-	}
-	return exit_code;
+	printf("End checking for exit\n");
+	return 0;
 }
 
 int main(int argc, char* argv[])
 {
 	assert(argc == ARGUMENT_NUMBER_SERVER);
 
-	int Ind, exit_code = 0;
-	SOCKET s_server = INVALID_SOCKET;
-	int portNumber;
-	unsigned long address;
+	int Ind, exit_code = 0, portNumber;
+	int max_sd, activity;
+	SOCKET s_server = INVALID_SOCKET;	
 	SOCKADDR_IN service;
+	fd_set readfds;
 	Lock* file_lock = New__Lock(NUM_OF_THREADS);
 	if (file_lock == NULL)
 	{
@@ -455,16 +449,9 @@ int main(int argc, char* argv[])
 		printf("Error at socket( ): %ld\n", WSAGetLastError());
 		exit_code = -1;
 		goto ServerCleanUp;
-	}
-	address = INADDR_ANY;
-	if (address == INADDR_NONE)
-	{
-		printf("The string \"%s\" cannot be converted into an ip address. ending program.\n", LOCAL_HOST_ADDRESS);
-		exit_code = -1;
-		goto CloseSocket;
-	}
+	}	
 	service.sin_family = AF_INET;
-	service.sin_addr.s_addr = address;
+	service.sin_addr.s_addr = INADDR_ANY;
 	service.sin_port = htons(portNumber);
 	//Bind Socket
 	if (bind(s_server, (SOCKADDR*)&service, sizeof(service)) == SOCKET_ERROR)
@@ -484,50 +471,99 @@ int main(int argc, char* argv[])
 	{
 		ThreadHandles[Ind] = NULL;
 	}
-	printf("Waiting for a client to connect...\n");
-	while (TRUE)
+	char* exit_message = (char*)calloc(5, sizeof(char));
+	if (exit_message == NULL)
 	{
-		SOCKET AcceptSocket = accept(s_server, NULL, NULL);
-		if (AcceptSocket == INVALID_SOCKET)
-		{
-			printf("Accepting connection with client failed, error %ld\n", WSAGetLastError());
-			exit_code = -1;
-			goto CloseSocket;
-		}
-
-		printf("Client Connected.\n");
-
-		Ind = FindFirstUnusedThreadSlot();
-
-		if (Ind == NUM_OF_THREADS) //two players already play
-		{
-			printf("No slots available for client, dropping the connection.\n");
-			ServerDeniedThreadInputs.ClientSocket = AcceptSocket;
-			ThreadToBeClosed = CreateThread(NULL,
-				0,
-				(LPTHREAD_START_ROUTINE)ServerDeniedThread,
-				&(ServerDeniedThreadInputs),
-				0,
-				NULL);
-		}
-		else
-		{
-			// need to start thread
-			ThreadInputs[Ind].ClientSocket = AcceptSocket;
-			ThreadInputs[Ind].ThreadNumber = Ind;
-			ThreadInputs[Ind].file_lock = file_lock;
-			ThreadHandles[Ind] = CreateThread(
-				NULL,
-				0,
-				(LPTHREAD_START_ROUTINE)StartThread,
-				&(ThreadInputs[Ind]),
-				0,
-				NULL
-			);
-		}
-
+		printf("MEM allocation failed\n");
+		exit_code = ERROR_CODE;
+		goto CloseSocket;
 	}
+	if (snprintf(exit_message, 5, "game") == 0)
+	{
+		printf("snprintf failed\n");
+		exit_code = ERROR_CODE;
+		goto CloseSocket;
+	}
+	HANDLE thread_exit = CreateThread(
+		NULL,
+		0,
+		(LPTHREAD_START_ROUTINE)ExitMainThread,
+		exit_message,
+		0,
+		NULL
+	);
+	if (thread_exit == NULL)
+	{
+		printf("thread creation failed, last error: %d\n", GetLastError());
+		exit_code = ERROR_CODE;
+		goto CloseSocket;
+	}
+	printf("Waiting for a client to connect...\n");
+	DWORD exit_retval = WaitForSingleObject(thread_exit, 0);
+	TIMEVAL wait_time;
+	wait_time.tv_sec = 1;
 
+	while (exit_retval != WAIT_OBJECT_0)
+	{
+		FD_ZERO(&readfds);
+		FD_SET(s_server, &readfds);
+		max_sd = s_server;		
+		activity = select(max_sd + 1, &readfds, NULL, NULL, &wait_time);
+
+		if ((activity < 0) && (errno != EINTR))
+		{
+			printf("select error");
+		}		
+		if (activity > 0)
+		{
+		
+			if (FD_ISSET(s_server, &readfds))
+			{				
+				SOCKET AcceptSocket = accept(s_server, NULL, NULL);
+				if (AcceptSocket == INVALID_SOCKET)
+				{
+					printf("Accepting connection with client failed, error %ld\n", WSAGetLastError());
+					exit_code = -1;
+					goto CloseSocket;
+				}
+				printf("Client Connected.\n");
+				Ind = FindFirstUnusedThreadSlot();
+
+				if (Ind == NUM_OF_THREADS) //two players already play
+				{
+					printf("No slots available for client, dropping the connection.\n");
+					ServerDeniedThreadInputs.ClientSocket = AcceptSocket;
+					ThreadToBeClosed = CreateThread(NULL,
+						0,
+						(LPTHREAD_START_ROUTINE)ServerDeniedThread,
+						&(ServerDeniedThreadInputs),
+						0,
+						NULL);
+				}
+				else
+				{
+					// need to start thread
+					ThreadInputs[Ind].ClientSocket = AcceptSocket;
+					ThreadInputs[Ind].ThreadNumber = Ind;
+					ThreadInputs[Ind].file_lock = file_lock;
+					ThreadHandles[Ind] = CreateThread(
+						NULL,
+						0,
+						(LPTHREAD_START_ROUTINE)StartThread,
+						&(ThreadInputs[Ind]),
+						0,
+						NULL
+					);
+				}
+			}
+		}
+		exit_retval = WaitForSingleObject(thread_exit, 0);		
+		if (exit_retval == WAIT_OBJECT_0)
+		{
+			break;
+		}
+	
+	}	
 	printf("end");
 	CleanupWorkerThreads();
 CloseSocket:
@@ -536,15 +572,15 @@ CloseSocket:
 		printf("Failed to close MainSocketServer, error %ld. Ending program\n", WSAGetLastError());
 	}
 ServerCleanUp:
-	Destroy__lock(file_lock);
-	if (WSACleanup() == SOCKET_ERROR)
-	{
-		printf("Failed to close WinsocketServer, error %ld. Ending program.\n", WSAGetLastError());
-	}
 	if (readAndWriteEvent != NULL)
 	{
 		CloseHandle(readAndWriteEvent);
 	}
+	Destroy__lock(file_lock);
+	if (WSACleanup() == SOCKET_ERROR)
+	{
+		printf("Failed to close WinsocketServer, error %ld. Ending program.\n", WSAGetLastError());
+	}	
 	return exit_code;
 }
 
