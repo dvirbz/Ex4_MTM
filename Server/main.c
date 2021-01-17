@@ -130,11 +130,13 @@ int Game(SOCKET s_communication, char* client_response, char* server_massage, Pl
 			printf("sent opponent quit.\n");
 			return SERVER_OPPONENT_QUIT_ID;
 		}
-		if (Handle_move(s_communication, client_response, server_massage,
-			current_player, other_player, gameSession, file_lock, opQuit) == -1)
+		int exit_code = 0;
+		exit_code = Handle_move(s_communication, client_response, server_massage,
+			current_player, other_player, gameSession, file_lock, opQuit);
+		if(exit_code != 0)
 		{
 			printf("can't handle move\n");
-			return ERROR_CODE;
+			return exit_code;
 		}
 		/* check for BnC, send to client*/
 		BnC_Data* data = GET__Bulls_And_Cows(current_player->setup, other_player->move);
@@ -178,7 +180,7 @@ int Game(SOCKET s_communication, char* client_response, char* server_massage, Pl
 				printf("can't send game results\n");
 				return ERROR_CODE;
 			}
-			break;
+			break;		
 		}
 	}
 	return 0;
@@ -248,7 +250,7 @@ DWORD WINAPI StartThread(LPVOID lp_params)
 			break;
 		case SERVER_NO_OPPONENTS_ID:
 			exit_code = 0;
-			goto MainMenu;
+			goto ResetGame;
 			break;
 		}
 		exit_code = Handle_setup(s_communication, client_response, server_massage, current_player,
@@ -294,7 +296,11 @@ DWORD WINAPI StartThread(LPVOID lp_params)
 		gameSession = NULL;
 		if (current_player->is_first_player == TRUE)//CloseFile
 		{
-			while (can_I_close_file % 2 != 0);
+			while (can_I_close_file % 2 != 0 && opponentQuit[1 - threadInput.ThreadNumber] == FALSE);
+			if (can_I_close_file % 2 != 0)
+			{
+				can_I_close_file++;
+			}
 			if (DeleteFileA(FILE_GAME_SESSION) == 0)
 			{
 				printf("error: %d\n", GetLastError());
@@ -324,14 +330,13 @@ DWORD WINAPI StartThread(LPVOID lp_params)
 	}
 
 ExitSeq:
-	printf("entered ExitSeq\n");
-	opponentQuit[threadInput.ThreadNumber] = TRUE;
+	printf("entered ExitSeq\n");	
 	if (gameSession != NULL)
 	{
-		CloseHandle(gameSession);
+		CloseHandle(gameSession);		
 		can_I_close_file++;
-	}
-
+	}	
+	opponentQuit[threadInput.ThreadNumber] = TRUE;
 	free(other_player);
 ExitFreeServerClientPlayer:
 	free(current_player);

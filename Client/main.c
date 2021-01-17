@@ -206,6 +206,10 @@ void Choose_Next_Play()
 	printf("1. Play against another client\n");
 	printf("2. Quit\n");
 }
+void Opponent_Quit()
+{
+	printf("Opponent quit.\n");
+}
 int GET__Connect_Player_Decision()
 {
 	int connect_status = 0;
@@ -265,6 +269,11 @@ int Game_Guess(Game_Status guess_status,SOCKET s_client, char* server_response,
 		}
 		else
 		{
+			if (server_res_id == SERVER_OPPONENT_QUIT_ID)
+			{
+				Opponent_Quit();
+				return END;
+			}
 			if (server_res_id == SHUTDOWN)
 			{
 				return SHUTDOWN;
@@ -293,7 +302,7 @@ int Game_Guess(Game_Status guess_status,SOCKET s_client, char* server_response,
 			return END;
 			break;
 		case SERVER_OPPONENT_QUIT_ID:
-			printf("Opponent quit.\n");
+			Opponent_Quit();
 			free(data);
 			return END;
 			break;
@@ -329,6 +338,11 @@ int Game_Setup(Game_Status guess_status, SOCKET s_client, char* server_response,
 	}
 	else
 	{
+		if (server_res_id == SERVER_OPPONENT_QUIT_ID)
+		{
+			Opponent_Quit();
+			return END;
+		}
 		if (server_res_id == SHUTDOWN)
 		{
 			return SHUTDOWN;
@@ -336,7 +350,7 @@ int Game_Setup(Game_Status guess_status, SOCKET s_client, char* server_response,
 		printf("SERVER_SETUP_REQUEST_ID pro: %s server_res_id: %d\n",server_response, server_res_id);
 		return ERROR_CODE;
 	}
-	return 0;
+	return GUESS;
 }
 int Game(Player_Status play_status, Game_Status guess_status, SOCKET s_client, char* server_response,
 	char* guess_seq, char* client_message)
@@ -357,6 +371,9 @@ int Game(Player_Status play_status, Game_Status guess_status, SOCKET s_client, c
 		case SHUTDOWN:
 			printf("SERVER_NO_OPPONENTS_ID SERVER_INVITE_ID pro: %s id: %d\n", server_response, server_res_id);
 			return SHUTDOWN;
+		case SERVER_OPPONENT_QUIT_ID:
+			play_status = MENU;
+			break;
 		default:printf("SERVER_NO_OPPONENTS_ID SERVER_INVITE_ID pro: %s id: %d\n", server_response, server_res_id);
 			return ERROR_CODE;
 			break;
@@ -367,34 +384,25 @@ int Game(Player_Status play_status, Game_Status guess_status, SOCKET s_client, c
 			{
 				int retval = Game_Setup(guess_status, s_client,
 					server_response, guess_seq, client_message);
-				if (retval == ERROR_CODE)
+				if (retval == ERROR_CODE || retval == SHUTDOWN)
 				{
-					return ERROR_CODE;
-				}
-				if (retval == SHUTDOWN)
-				{
-					return SHUTDOWN;
-				}
-				guess_status = GUESS;
+					return retval;
+				}				
+				guess_status = retval;
 			}
 
 			guess_status = Game_Guess(guess_status, s_client, server_response,
 				guess_seq, client_message);
-			if (guess_status == ERROR_CODE)
-				return ERROR_CODE;
-			if (guess_status == SHUTDOWN)
-			{
-				return SHUTDOWN;
-			}
+			if (guess_status == ERROR_CODE || guess_status == SHUTDOWN)
+				return guess_status;			
 			if (guess_status == END)
 			{
-				if (Handle_Server_Main_Menu(s_client, server_response, play_status, client_message) == -1)
+				if (Handle_Server_Main_Menu(s_client, server_response, play_status, client_message) == ERROR_CODE)
 				{
 					return ERROR_CODE;
 				}
 				play_status = PLAY;
 			}
-
 		}
 		else
 		{
@@ -581,12 +589,12 @@ int GET__Server_Response(SOCKET s_client, char * server_response, int max_wait_t
 	if (retval == ERROR_CODE)
 	{
 		printf("Recv Failed\n");
-		return ERROR_CODE;
+		return retval;
 	}
 	if (retval == SHUTDOWN)
 	{
 		printf("Gracefull disconnect started\n");
-		return SHUTDOWN;
+		return retval;
 	}
 	return GET__Server_Response_ID(server_response);
 }

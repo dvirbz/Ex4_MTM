@@ -16,7 +16,7 @@ typedef struct
 
 typedef enum
 {
-	CURRENT_WON = 1,
+	CURRENT_WON = 3,
 	OTHER_WON,
 	DRAW,
 	CONTINUE

@@ -238,13 +238,25 @@ int Handle_Client_Request_Denied(SOCKET s_communication, char* client_response, 
 int Handle_setup(SOCKET s_communication, char* client_response, char* server_massage,
 	Player* current_player, Player* other_player, HANDLE gameSession, Lock* file_lock, BOOL opponentQuit)
 {
-	int exit_code = send_setup_request(s_communication, server_massage);
-	if (exit_code != 0)
+	int exit_code = 0;
+	if (opponentQuit == TRUE)
 	{
-		printf("send setupReq failed!\n");
-		return exit_code;
+		if (send_server_no_opponents(s_communication, server_massage) == EXIT_CODE)
+		{
+			printf("send setupReq failed!\n");
+			return EXIT_CODE;
+		}
+		return SERVER_NO_OPPONENTS_ID;
 	}
-
+	else
+	{
+		exit_code = send_setup_request(s_communication, server_massage);
+		if (exit_code != 0)
+		{
+			printf("send setupReq failed!\n");
+			return exit_code;
+		}
+	}
 	exit_code = Recv_Socket(s_communication, client_response, TEN_MINUTES);
 	if (exit_code != 0)
 	{
@@ -260,7 +272,7 @@ int Handle_setup(SOCKET s_communication, char* client_response, char* server_mas
 	}
 	if (clResId != CLIENT_SETUP_ID)
 	{
-		printf("didn't get setup id, got: %s\n", client_response);
+		printf("didn't get setup id, got: %s, id: %d\n", client_response, clResId);
 		return ERROR_CODE;
 	}
 
@@ -296,40 +308,58 @@ int Handle_setup(SOCKET s_communication, char* client_response, char* server_mas
 int Handle_move(SOCKET s_communication, char* client_response, char* server_massage,
 	Player* current_player, Player* other_player, HANDLE gameSession, Lock* file_lock, BOOL opponentQuit)
 {
-	if (send_move_request(s_communication, server_massage) == EXIT_CODE)
+	if (opponentQuit == TRUE)
 	{
-		printf("send setupReq failed!\n");
-		return EXIT_CODE;
+		if (send_server_no_opponents(s_communication, server_massage) == EXIT_CODE)
+		{
+			printf("send setupReq failed!\n");
+			return EXIT_CODE;
+		}
+		return SERVER_NO_OPPONENTS_ID;
 	}
-
-	if (Recv_Socket(s_communication, client_response, TEN_MINUTES) == -1)
+	else
+	{
+		if (send_move_request(s_communication, server_massage) == EXIT_CODE)
+		{
+			printf("send setupReq failed!\n");
+			return EXIT_CODE;
+		}
+	}
+	int exit_code = 0;
+	exit_code = Recv_Socket(s_communication, client_response, TEN_MINUTES);
+	if(exit_code != 0)
 	{
 		printf("Recv Failed\n");
-		return -1;
+		return exit_code;
 	}
-
-	if (GET__Client_Response_ID(client_response) != CLIENT_PLAYER_MOVE_ID)
+	int clResId = GET__Client_Response_ID(client_response);
+	if (clResId == CLIENT_DISCONNECT_ID)
 	{
-		printf("didn't get player move id, got: %s\n", client_response);
-		return -1;
+		printf("got CLIENT_DISCONNECT_ID\n");
+		return CLIENT_DISCONNECT_ID;
+	}
+	if (clResId != CLIENT_PLAYER_MOVE_ID)
+	{
+		printf("didn't get move id, got: %s, id: %d\n", client_response, clResId);
+		return ERROR_CODE;
 	}
 
 	BnC_Data* data = GET__BnC_Data(client_response);
 	if (data == NULL)
 	{
 		printf("can't get BnCdata, got: %s\n", client_response);
-		return -1;
+		return ERROR_CODE;
 	}
 
 	if (snprintf(current_player->move, NUM_DIGITIS_GUESS, "%s", data->first_string) == 0)
 	{
 		printf("can't snprintf\n");
-		return -1;
+		return ERROR_CODE;
 	}
 	free(data);
 	if (write_and_read(gameSession, current_player, other_player, file_lock, opponentQuit) != 0)
 	{
-		return -1;
+		return ERROR_CODE;
 	}
 
 	return 0;
@@ -387,19 +417,17 @@ int versus_or_disconnect(SOCKET s_communication, HANDLE* gameSession, char* clie
 		}
 		
 	}
-	print_player(current_player);
-	print_player(other_player);
 	//check if both players want to send invite
 	DWORD retVal;
 	if (current_player->is_first_player == TRUE)
 	{
 		SetEvent(first_want_to_invite);
-		retVal = WaitForSingleObject(second_want_to_invite, TEN_MINUTES);
+		retVal = WaitForSingleObject(second_want_to_invite, FIFTEEN_SEC);
 	}
 	else
 	{
 		SetEvent(second_want_to_invite);
-		retVal = WaitForSingleObject(first_want_to_invite, TEN_MINUTES);
+		retVal = WaitForSingleObject(first_want_to_invite, FIFTEEN_SEC);
 	}
 	switch (retVal)
 	{
@@ -424,8 +452,6 @@ int versus_or_disconnect(SOCKET s_communication, HANDLE* gameSession, char* clie
 	}
 	return 0;
 }
-
-
 
 int first_player_versus(SOCKET s_communication, char* server_massage, 
 	HANDLE gameSession, Player* current_player, Player* other_player, Lock* file_lock , BOOL opponentQuit)
