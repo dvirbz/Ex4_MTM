@@ -16,6 +16,7 @@ int recive_client_request(SOCKET s_communication, char* client_response, Player*
 
 /* Send func */
 int send_approved(SOCKET s_communication, char* server_massage);
+int send_server_denied(SOCKET s_communication, char* server_massage);
 int send_main_menu(SOCKET s_communication, char* server_massage);
 int send_invite(SOCKET s_communication, char* server_massage, char* other_username);
 int send_setup_request(SOCKET s_communication, char* server_massage);
@@ -29,7 +30,9 @@ int send_game_draw(SOCKET s_communication, char* server_massage,
 int send_server_no_opponents(SOCKET s_communication, char* server_massage);
 
 /* Send and Recv func */
-int Handle_Client_Request(SOCKET s_communication, char* client_response, char* server_massage,
+int Handle_Client_Request_Approved(SOCKET s_communication, char* client_response, char* server_massage,
+	Player* current_player);
+int Handle_Client_Request_Denied(SOCKET s_communication, char* client_response, char* server_massage,
 	Player* current_player);
 int Handle_setup(SOCKET s_communication, char* client_response, char* server_massage,
 	Player* current_player, Player* other_player, HANDLE gameSession, Lock* file_lock);

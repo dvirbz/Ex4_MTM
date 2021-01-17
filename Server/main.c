@@ -26,7 +26,9 @@ typedef struct {
 	HANDLE readAndWriteEvent;
 }ThreadParams;
 
+HANDLE ThreadToBeClosed;
 ThreadParams ThreadInputs[NUM_OF_THREADS];
+ThreadParams ServerDeniedThreadInputs;
 int can_I_close_file = 0;
 
 int InitializeWSA()
@@ -66,6 +68,23 @@ void CleanupWorkerThreads()
 			}
 		}
 	}
+	if (ThreadToBeClosed != NULL)
+	{
+		DWORD Res = WaitForSingleObject(ThreadToBeClosed, INFINITE);
+
+		if (Res == WAIT_OBJECT_0)
+		{
+			closesocket(ServerDeniedThreadInputs.ClientSocket);
+			CloseHandle(ThreadToBeClosed);
+			ThreadToBeClosed = NULL;
+		}
+		else
+		{
+			printf("Waiting for thread failed. Ending program\n");
+			return;
+		}
+	}
+	return;
 }
 
 int FindFirstUnusedThreadSlot()
@@ -205,35 +224,36 @@ DWORD WINAPI StartThread(LPVOID lp_params)
 	char* client_response = (char*)calloc(MAX_PRO_LEN, sizeof(char));
 	if (client_response == NULL)
 	{
-		free(server_massage);
 		printf("cant malloc client response\n");
 		exit_code = -1;
-		goto Exit_No_Free;
+		goto ExitFreeServer;
 	}
 
 	Player* current_player = (Player*)calloc(1, sizeof(Player));
 	if (current_player == NULL)
 	{
+		printf("cant malloc current player\n");
 		exit_code = -1;
-		goto Exit_No_Free;
+		goto ExitFreeServerClient;
 	}
 	Player* other_player = (Player*)calloc(1, sizeof(Player));
 	if (other_player == NULL)
 	{
+		printf("cant malloc other player\n");
 		exit_code = -1;
-		goto Exit_No_Free;
+		goto ExitFreeServerClientPlayer;
 	}
-	exit_code = init_playeres(current_player,other_player);
+	exit_code = init_playeres(current_player, other_player);
 	if (exit_code != 0)
-		goto ExitSeq;	
+		goto ExitSeq;
 
-	exit_code = Handle_Client_Request(s_communication, client_response, server_massage, current_player);
+	exit_code = Handle_Client_Request_Approved(s_communication, client_response, server_massage, current_player);
 	if (exit_code != 0)
 		goto ExitSeq;
 	int pre_game_code = 0;
 	while (TRUE)
 	{
-	MainMenu:		
+	MainMenu:
 		exit_code = send_main_menu(s_communication, server_massage);
 		if (exit_code == ERROR_CODE)
 			goto ExitSeq;
@@ -310,6 +330,7 @@ DWORD WINAPI StartThread(LPVOID lp_params)
 			goto ExitSeq;
 		}
 	}
+
 ExitSeq:
 	if (gameSession != NULL)
 	{
@@ -318,16 +339,68 @@ ExitSeq:
 	}
 	printf("entered ExitSeq\n");
 	print_player(current_player);
-	free(server_massage);
-	free(client_response);
-	free(current_player);
+
 	free(other_player);
+ExitFreeServerClientPlayer:
+	free(current_player);
+	shutdown(s_communication, SD_SEND);
+	while (exit_code != SHUTDOWN)
+	{
+		exit_code = Recv_Socket(s_communication, client_response, FIFTEEN_SEC);
+	}
+ExitFreeServerClient:
+	free(client_response);
+ExitFreeServer:
+	free(server_massage);
 Exit_No_Free:
 	if (closesocket(s_communication) == SOCKET_ERROR)
 	{
 		printf("Failed to close MainSocketThread, error %ld. Ending program\n", WSAGetLastError());
 	}
 	printf("player quit\n");
+	return exit_code;
+}
+
+DWORD WINAPI ServerDeniedThread(LPVOID lp_params)
+{
+	ThreadParams threadInput = *(ThreadParams*)lp_params;
+	SOCKET s_communication = threadInput.ClientSocket;
+	int exit_code = 0;
+
+	char* server_massage = (char*)calloc(MAX_PRO_LEN, sizeof(char));
+	if (server_massage == NULL)
+	{
+		printf("cant malloc server massage\n");
+		exit_code = -1;
+		goto Exit_No_Free;
+	}
+	char* client_response = (char*)calloc(MAX_PRO_LEN, sizeof(char));
+	if (client_response == NULL)
+	{
+		printf("cant malloc client response\n");
+		exit_code = -1;
+		goto ExitFreeServer;
+	}
+
+	Player* current_player = (Player*)calloc(1, sizeof(Player));
+	if (current_player == NULL)
+	{
+		printf("cant malloc current player\n");
+		exit_code = -1;
+		goto ExitFreeServerClient;
+	}
+
+	exit_code = Handle_Client_Request_Denied(s_communication, client_response, server_massage, current_player);
+
+ExitFreeServerClient:
+	free(client_response);
+ExitFreeServer:
+	free(server_massage);
+Exit_No_Free:
+	if (closesocket(s_communication) == SOCKET_ERROR)
+	{
+		printf("Failed to close MainSocketThread, error %ld. Ending program\n", WSAGetLastError());
+	}
 	return exit_code;
 }
 
@@ -429,7 +502,13 @@ int main(int argc, char* argv[])
 		if (Ind == NUM_OF_THREADS) //two players already play
 		{
 			printf("No slots available for client, dropping the connection.\n");
-			closesocket(AcceptSocket); //Server Denied Protocol also check for failure
+			ServerDeniedThreadInputs.ClientSocket = AcceptSocket;
+			ThreadToBeClosed = CreateThread(NULL,
+				0,
+				(LPTHREAD_START_ROUTINE)ServerDeniedThread,
+				&(ServerDeniedThreadInputs),
+				0,
+				NULL);
 		}
 		else
 		{

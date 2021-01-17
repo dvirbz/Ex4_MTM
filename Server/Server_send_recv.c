@@ -63,6 +63,20 @@ int send_approved(SOCKET s_communication, char* server_massage)
 	}
 	return 0;
 }
+int send_server_denied(SOCKET s_communication, char* server_massage)
+{
+	if (GET__Server_Pro(server_massage, SERVER_DENIED) == -1)
+	{
+		printf("Protocol failed\n");
+		return -1;
+	}
+	if (Send_Socket(s_communication, server_massage, strlen(server_massage), FIFTEEN_SEC) == -1)
+	{
+		printf("Send Failed\n");
+		return -1;
+	}
+	return 0;
+}
 int send_main_menu(SOCKET s_communication, char* server_massage)
 {
 	if (GET__Server_Pro(server_massage, SERVER_MAIN_MENU) == -1)
@@ -183,7 +197,7 @@ int send_server_no_opponents(SOCKET s_communication, char* server_massage)
 }
 
 /* Send and Recv func */
-int Handle_Client_Request(SOCKET s_communication, char* client_response, char* server_massage,
+int Handle_Client_Request_Approved(SOCKET s_communication, char* client_response, char* server_massage,
 	Player* current_player)
 {
 	int exit_code = 0;
@@ -191,6 +205,18 @@ int Handle_Client_Request(SOCKET s_communication, char* client_response, char* s
 	if (exit_code != 0)
 		return exit_code;
 	exit_code = send_approved(s_communication, server_massage);
+	if (exit_code != 0)
+		return exit_code;
+	return exit_code;
+}
+int Handle_Client_Request_Denied(SOCKET s_communication, char* client_response, char* server_massage,
+	Player* current_player)
+{
+	int exit_code = 0;
+	exit_code = recive_client_request(s_communication, client_response, current_player);
+	if (exit_code != 0)
+		return exit_code;
+	exit_code = send_server_denied(s_communication, server_massage);
 	if (exit_code != 0)
 		return exit_code;
 	return exit_code;

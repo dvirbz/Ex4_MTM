@@ -145,11 +145,11 @@ int main(int argc, char* argv[])
 ExitSeq:
 	Handle_Client_Disconnect(s_client, client_message);
 	/* wait until server support this gracefull disconnect too*/
-	/*shutdown(s_client, SD_SEND);
+	shutdown(s_client, SD_SEND);
 	while (exit_code != SHUTDOWN)
 	{
-		exit_code = Recv_Socket(s_client, server_response);
-	}*/
+		exit_code = Recv_Socket(s_client, server_response, FIFTEEN_SEC);
+	}
 	free(guess_seq);
 	free(client_message);
 	free(server_response);
@@ -447,8 +447,8 @@ int Connect(SOCKET s_client, SOCKADDR_IN clientService, char* server_response,in
 			{			
 				return -1;
 			}
-			shutdown(s_client, SD_SEND);
-			while (Recv_Socket(s_client, server_response, FIFTEEN_SEC) != SHUTDOWN);
+			/*shutdown(s_client, SD_SEND);
+			while (Recv_Socket(s_client, server_response, FIFTEEN_SEC) != SHUTDOWN);*/
 			if (closesocket(s_client) == SOCKET_ERROR)
 			{				
 				return -1;
