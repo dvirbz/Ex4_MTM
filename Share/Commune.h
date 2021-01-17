@@ -7,7 +7,8 @@
 #pragma comment(lib,"ws2_32.lib")
 
 #include <stdio.h>
-#include <HardCodedData.h>
+#include "HardCodedData.h"
+
 typedef struct
 {
 	int bulls, cows;
