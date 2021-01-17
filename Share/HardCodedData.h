@@ -37,6 +37,7 @@
 #define LOCAL_HOST_ADDRESS "127.0.0.1"
 #define FILE_GAME_SESSION "GameSession.txt"
 #define ERROR_CODE -1
+#define RESET_GAME 10
 #define BULLS_AND_COWS_STR_LEN 2
 #define TEN_MINUTES 600000
 #define FIFTEEN_SEC 15000

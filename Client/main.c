@@ -51,7 +51,7 @@ int Connect(SOCKET s_client, SOCKADDR_IN clientService, char* server_response, i
 	char* client_message, Player_Status connect_status);
 
 /* Server Related Func*/
-int GET__Server_Response(SOCKET s_client, char* server_response);
+int GET__Server_Response(SOCKET s_client, char* server_response, int max_wait_time);
 int Handle_Server_Main_Menu(SOCKET s_client, char* server_response,
 	Player_Status play_status, char* client_message);
 
@@ -246,7 +246,7 @@ int Game_Guess(Game_Status guess_status,SOCKET s_client, char* server_response,
 {
 	while (guess_status == GUESS)
 	{
-		int server_res_id = GET__Server_Response(s_client, server_response);
+		int server_res_id = GET__Server_Response(s_client, server_response, TEN_MINUTES);
 		if (server_res_id == SERVER_PLAYER_MOVE_REQUEST_ID)
 		{
 			printf("Choose your guess:\n");
@@ -272,7 +272,7 @@ int Game_Guess(Game_Status guess_status,SOCKET s_client, char* server_response,
 			printf("SERVER_PLAYER_MOVE_REQUEST_ID pro: %s server_res_id: %d\n",server_response, server_res_id);
 			return -1;
 		}
-		server_res_id = GET__Server_Response(s_client, server_response);
+		server_res_id = GET__Server_Response(s_client, server_response, TEN_MINUTES);
 		BnC_Data* data = GET__BnC_Data(server_response);
 		switch (server_res_id)
 		{
@@ -311,7 +311,7 @@ int Game_Guess(Game_Status guess_status,SOCKET s_client, char* server_response,
 int Game_Setup(Game_Status guess_status, SOCKET s_client, char* server_response,
 	char* guess_seq, char* client_message)
 {
-	int server_res_id = GET__Server_Response(s_client, server_response);
+	int server_res_id = GET__Server_Response(s_client, server_response, TEN_MINUTES);
 	if (server_res_id == SERVER_SETUP_REQUEST_ID)
 	{
 		printf("Choose your 4 digits:\n");
@@ -343,7 +343,7 @@ int Game(Player_Status play_status, Game_Status guess_status, SOCKET s_client, c
 {
 	while (play_status == PLAY)
 	{
-		int server_res_id = GET__Server_Response(s_client, server_response);
+		int server_res_id = GET__Server_Response(s_client, server_response, THIRTY_SEC);
 		switch (server_res_id)
 		{
 		case SERVER_INVITE_ID:
@@ -437,7 +437,7 @@ int Connect(SOCKET s_client, SOCKADDR_IN clientService, char* server_response,in
 		}
 		
 		/* Get Server Response */
-		int server_res_id = GET__Server_Response(s_client, server_response);
+		int server_res_id = GET__Server_Response(s_client, server_response, FIFTEEN_SEC);
 		switch (server_res_id)
 		{
 		case SERVER_DENIED_ID:
@@ -550,7 +550,7 @@ int Handle_Client_Player_Move(SOCKET s_client, char* client_message, char* guess
 int Handle_Server_Main_Menu(SOCKET s_client, char* server_response,
 	Player_Status play_status, char* client_message)
 {
-	int server_res_id = GET__Server_Response(s_client, server_response);
+	int server_res_id = GET__Server_Response(s_client, server_response, FIFTEEN_SEC);
 	if (server_res_id == SERVER_MAIN_MENU_ID)
 	{
 		Choose_Next_Play();
@@ -576,14 +576,10 @@ int Handle_Server_Main_Menu(SOCKET s_client, char* server_response,
 	return 0;
 }
 
-int Connect_to_Server()
-{
-	return 0;
-}
-int GET__Server_Response(SOCKET s_client, char * server_response)
+int GET__Server_Response(SOCKET s_client, char * server_response, int max_wait_time)
 {	
 	snprintf(server_response, MAX_PRO_LEN, "\0");
-	int retval = Recv_Socket(s_client, server_response, FIFTEEN_SEC);
+	int retval = Recv_Socket(s_client, server_response, max_wait_time);
 	if (retval == -1)
 	{
 		printf("Recv Failed\n");
@@ -597,5 +593,3 @@ int GET__Server_Response(SOCKET s_client, char * server_response)
 	return GET__Server_Response_ID(server_response);
 }
 
-/*time_t x = time(NULL);
-while (time(NULL) > x + 7);*/

@@ -23,7 +23,7 @@ typedef enum
 }Game_Results;
 
 void print_player(Player* player);
-int init_player(Player* player);
+int init_playeres(Player* current_player, Player* other_player);
 Game_Results GET__Game_Results(Player* current_player, Player* other_player);
 BnC_Data* GET__Bulls_And_Cows(char* setup, char* guess);
 #endif

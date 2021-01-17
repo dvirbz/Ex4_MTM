@@ -35,7 +35,18 @@ int init_player(Player* player)
 	printf("succses!\n");
 	return 0;
 }
-
+int init_playeres(Player* current_player, Player* other_player)
+{
+	int exit_code = 0;
+	exit_code = init_player(current_player);
+	if (exit_code != 0)
+		goto ExitSeq;
+	exit_code = init_player(other_player);
+	if (exit_code != 0)
+		goto ExitSeq;
+ExitSeq:
+	return exit_code;
+}
 Game_Results GET__Game_Results(Player* current_player, Player* other_player)
 {
 	if (current_player->bulls == NUM_DIGITIS_GUESS - 1)

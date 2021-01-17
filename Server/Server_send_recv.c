@@ -6,6 +6,13 @@ SERVER_SEND_RECV_H HANDLE ThreadHandles[NUM_OF_THREADS];
 SERVER_SEND_RECV_H HANDLE first_want_to_invite = NULL;
 SERVER_SEND_RECV_H HANDLE second_want_to_invite = NULL;
 SERVER_SEND_RECV_H HANDLE readAndWriteEvent = NULL;
+
+int first_player_versus(SOCKET s_communication, char* server_massage,
+	HANDLE gameSession, Player* current_player, Player* other_player, Lock* file_lock);
+int second_player_versus(HANDLE* gameSession, Player* current_player,
+	Player* other_player, Lock* file_lock);
+BOOL no_opponents();
+
 /* Recv func */
 int recive_client_request(SOCKET s_communication, char* client_response, Player* player)
 {
@@ -176,6 +183,18 @@ int send_server_no_opponents(SOCKET s_communication, char* server_massage)
 }
 
 /* Send and Recv func */
+int Handle_Client_Request(SOCKET s_communication, char* client_response, char* server_massage,
+	Player* current_player)
+{
+	int exit_code = 0;
+	exit_code = recive_client_request(s_communication, client_response, current_player);
+	if (exit_code != 0)
+		return exit_code;
+	exit_code = send_approved(s_communication, server_massage);
+	if (exit_code != 0)
+		return exit_code;
+	return exit_code;
+}
 int Handle_setup(SOCKET s_communication, char* client_response, char* server_massage,
 	Player* current_player, Player* other_player, HANDLE gameSession, Lock* file_lock)
 {
@@ -185,39 +204,44 @@ int Handle_setup(SOCKET s_communication, char* client_response, char* server_mas
 		return EXIT_CODE;
 	}
 
-	if (Recv_Socket(s_communication, client_response, FIFTEEN_SEC) == -1)
+	if (Recv_Socket(s_communication, client_response, TEN_MINUTES) == -1)
 	{
 		printf("Recv Failed\n");
-		return -1;
+		return ERROR_CODE;
 	}
 
 	if (GET__Client_Response_ID(client_response) != CLIENT_SETUP_ID)
 	{
 		printf("didn't get setup id, got: %s\n", client_response);
-		return -1;
+		return ERROR_CODE;
 	}
 
 	BnC_Data* data = GET__BnC_Data(client_response);
 	if (data == NULL)
 	{
 		printf("can't get BnCdata, got: %s\n", client_response);
-		return -1;
+		return ERROR_CODE;
 	}
 
 	if (snprintf(current_player->setup, NUM_DIGITIS_GUESS, "%s", data->first_string) == 0)
 	{
 		printf("can't snprintf\n");
-		return -1;
+		return ERROR_CODE;
 	}
 	free(data);
 	if (snprintf(current_player->move, NUM_DIGITIS_GUESS, "%s", current_player->setup) == 0)
 	{
 		printf("can't snprintf\n");
-		return -1;
+		return ERROR_CODE;
 	}
 	if (write_and_read(gameSession, current_player, other_player, file_lock) != 0)
 	{
-		return -1;
+		return ERROR_CODE;
+	}
+	if (snprintf(other_player->setup, NUM_DIGITIS_GUESS, "%s", other_player->move) == 0)
+	{
+		printf("snprintf failed\n");
+		return ERROR_CODE;
 	}
 	return 0;
 }
@@ -230,7 +254,7 @@ int Handle_move(SOCKET s_communication, char* client_response, char* server_mass
 		return EXIT_CODE;
 	}
 
-	if (Recv_Socket(s_communication, client_response, FIFTEEN_SEC) == -1)
+	if (Recv_Socket(s_communication, client_response, TEN_MINUTES) == -1)
 	{
 		printf("Recv Failed\n");
 		return -1;
@@ -265,7 +289,7 @@ int Handle_move(SOCKET s_communication, char* client_response, char* server_mass
 int versus_or_disconnect(SOCKET s_communication, HANDLE* gameSession, char* client_response,
 	char* server_massage, Player* current_player, Player* other_player, Lock* file_lock)
 {
-	if (Recv_Socket(s_communication, client_response, FIFTEEN_SEC) == -1)
+	if (Recv_Socket(s_communication, client_response, TEN_MINUTES) == -1)
 	{
 		printf("Recv Failed\n");
 		return ERROR_CODE;
@@ -353,6 +377,8 @@ int versus_or_disconnect(SOCKET s_communication, HANDLE* gameSession, char* clie
 	return 0;
 }
 
+
+
 int first_player_versus(SOCKET s_communication, char* server_massage, 
 	HANDLE gameSession, Player* current_player, Player* other_player, Lock* file_lock)
 {
@@ -409,7 +435,8 @@ ReleaseMutex:
 	}
 	return ERROR_CODE;
 }
-int second_player_versus(HANDLE* gameSession, Player* current_player, Player* other_player, Lock* file_lock)
+int second_player_versus(HANDLE* gameSession, Player* current_player,
+	Player* other_player, Lock* file_lock)
 {
 	if (*gameSession == INVALID_HANDLE_VALUE || *gameSession == NULL)
 	{

@@ -93,6 +93,100 @@ int FindFirstUnusedThreadSlot()
 	return Ind;
 }
 
+int Game(SOCKET s_communication, char* client_response, char* server_massage, Player * current_player,
+	Player* other_player, HANDLE gameSession, Lock * file_lock)
+{
+	int play_status = 0;
+	while (play_status == 0)
+	{
+		if (Handle_move(s_communication, client_response, server_massage,
+			current_player, other_player, gameSession, file_lock) == -1)
+		{
+			printf("can't handle move\n");
+			return ERROR_CODE;
+		}
+		/* check for BnC, send to client*/
+		BnC_Data* data = GET__Bulls_And_Cows(current_player->setup, other_player->move);
+		if (data == NULL)
+		{
+			printf("can't handle data\n");
+			return ERROR_CODE;
+		}
+		other_player->bulls = data->bulls;
+		other_player->cows = data->cows;
+		if (write_to_file(gameSession, current_player, other_player, file_lock) != 0)
+		{
+			printf("can't write to file\n");
+			return ERROR_CODE;
+		}
+		if (read__line(gameSession, current_player, other_player, file_lock) != 0)
+		{
+			printf("can't read from file\n");
+			return ERROR_CODE;
+		}
+		switch (GET__Game_Results(current_player, other_player))
+		{
+		case CURRENT_WON:
+			send_game_won(s_communication, server_massage, other_player, current_player);
+			printf("I Won\n");
+			play_status = -1;
+			break;
+		case OTHER_WON:
+			send_game_won(s_communication, server_massage, other_player, other_player);
+			printf("Other Won\n");
+			play_status = -1;
+			break;
+		case DRAW:
+			send_game_draw(s_communication, server_massage, other_player, current_player);
+			printf("It's a tie\n");
+			play_status = -1;
+			break;
+		case CONTINUE:
+			if (send_game_results(s_communication, server_massage, other_player, current_player) != 0)
+			{
+				printf("can't send game results\n");
+				return ERROR_CODE;
+			}
+			break;
+		}
+	}
+	return 0;
+}
+
+int Pre_Game(SOCKET s_communication, char* client_response, char* server_massage, Player* current_player,
+	Player* other_player, HANDLE *gameSession, Lock* file_lock)
+{
+	int exit_code = 0;
+	exit_code = send_main_menu(s_communication, server_massage);
+	if (exit_code == ERROR_CODE)
+		goto ExitSeq;
+	switch (versus_or_disconnect(s_communication, gameSession, client_response,
+		server_massage, current_player, other_player, file_lock))
+	{
+	case ERROR_CODE:
+		exit_code = RESET_GAME;
+		goto ExitSeq;
+	case CLIENT_DISCONNECT_ID:
+		exit_code = CLIENT_DISCONNECT_ID;
+		goto ExitSeq;
+		break;
+	case SERVER_NO_OPPONENTS_ID:
+		exit_code = SERVER_NO_OPPONENTS_ID;
+		goto ExitSeq;
+		break;
+	}
+
+	if (Handle_setup(s_communication, client_response, server_massage, current_player,
+		other_player, *gameSession, file_lock) == -1)
+	{
+		printf("can't handle setup\n");
+		exit_code = RESET_GAME;
+		goto ExitSeq;
+	}
+ExitSeq:
+	return exit_code;
+}
+
 DWORD WINAPI StartThread(LPVOID lp_params)
 {
 	ThreadParams threadInput = *(ThreadParams*)lp_params;
@@ -129,25 +223,19 @@ DWORD WINAPI StartThread(LPVOID lp_params)
 		exit_code = -1;
 		goto Exit_No_Free;
 	}
-	exit_code = init_player(current_player);
+	exit_code = init_playeres(current_player,other_player);
 	if (exit_code != 0)
-		goto ExitSeq;
-	exit_code = init_player(other_player);
-	if (exit_code != 0)
-		goto ExitSeq;
-	exit_code = recive_client_request(s_communication, client_response, current_player);
-	if (exit_code != 0)
-		goto ExitSeq;
+		goto ExitSeq;	
 
-	printf("Your Username: %s\n", current_player->username);
-	exit_code = send_approved(s_communication, server_massage);
-	if (exit_code == -1)
+	exit_code = Handle_Client_Request(s_communication, client_response, server_massage, current_player);
+	if (exit_code != 0)
 		goto ExitSeq;
+	int pre_game_code = 0;
 	while (TRUE)
 	{
-	MainMenu:
+	MainMenu:		
 		exit_code = send_main_menu(s_communication, server_massage);
-		if (exit_code == -1)
+		if (exit_code == ERROR_CODE)
 			goto ExitSeq;
 		switch (versus_or_disconnect(s_communication, &gameSession, client_response,
 			server_massage, current_player, other_player, file_lock))
@@ -156,90 +244,42 @@ DWORD WINAPI StartThread(LPVOID lp_params)
 			exit_code = ERROR_CODE;
 			goto ResetGame;
 		case CLIENT_DISCONNECT_ID:
-			exit_code = 0;
+			exit_code = CLIENT_DISCONNECT_ID;
 			goto ExitSeq;
 			break;
 		case SERVER_NO_OPPONENTS_ID:
 			exit_code = 0;
 			goto MainMenu;
 			break;
-		}		
-		printf("Yay\n");
+		}
 		if (Handle_setup(s_communication, client_response, server_massage, current_player,
 			other_player, gameSession, file_lock) == -1)
 		{
 			printf("can't handle setup\n");
-			exit_code = -1;
-			goto ResetGame;
+			exit_code = ERROR_CODE;
+			goto ExitSeq;
 		}
-		print_player(other_player);
-		if (snprintf(other_player->setup, NUM_DIGITIS_GUESS, "%s", other_player->move) == 0)
+		/*pre_game_code = Pre_Game(s_communication, client_response, server_massage, current_player,
+			other_player, &gameSession, file_lock);
+		switch (pre_game_code)
 		{
-			printf("snprintf failed\n");
-			exit_code = -1;
+		case ERROR_CODE:
+			exit_code = ERROR_CODE;
+			goto ExitSeq;
+		case RESET_GAME:
+			exit_code = ERROR_CODE;
 			goto ResetGame;
-		}
-		print_player(other_player);
-		int play_status = 0;
-		while (play_status == 0)
-		{
-			if (Handle_move(s_communication, client_response, server_massage,
-				current_player, other_player, gameSession, file_lock) == -1)
-			{
-				printf("can't handle move\n");
-				exit_code = -1;
-				goto ResetGame;
-			}
-			/* check for BnC, send to client*/
-			BnC_Data* data = GET__Bulls_And_Cows(current_player->setup, other_player->move);
-			if (data == NULL)
-			{
-				printf("can't handle data\n");
-				exit_code = -1;
-				goto ResetGame;
-			}
-			other_player->bulls = data->bulls;
-			other_player->cows = data->cows;
-			if (write_to_file(gameSession, current_player, other_player, file_lock) != 0)
-			{
-				printf("can't write to file\n");
-				exit_code = -1;
-				goto ResetGame;
-			}
-			if (read__line(gameSession, current_player, other_player, file_lock) != 0)
-			{
-				printf("can't read from file\n");
-				exit_code = -1;
-				goto ResetGame;
-			}
-			switch (GET__Game_Results(current_player, other_player))
-			{
-			case CURRENT_WON:
-				send_game_won(s_communication, server_massage, other_player, current_player);
-				printf("I Won\n");
-				play_status = -1;
-				break;
-			case OTHER_WON:
-				send_game_won(s_communication, server_massage, other_player, other_player);
-				printf("Other Won\n");
-				play_status = -1;
-				break;
-			case DRAW:
-				send_game_draw(s_communication, server_massage, other_player, current_player);
-				printf("It's a tie\n");
-				play_status = -1;
-				break;
-			case CONTINUE:
-				if (send_game_results(s_communication, server_massage, other_player, current_player) != 0)
-				{
-					printf("can't send game results\n");
-					exit_code = -1;
-					goto ResetGame;
-				}
-				break;
-			}
-		}
-
+		case CLIENT_DISCONNECT_ID:
+			exit_code = CLIENT_DISCONNECT_ID;
+			goto ExitSeq;
+		case SERVER_NO_OPPONENTS_ID:
+			exit_code = 0;
+			goto MainMenu;
+		default:
+			break;
+		}*/
+		exit_code = Game(s_communication, client_response, server_massage, current_player,
+			other_player, gameSession, file_lock);
 	ResetGame:
 		if (gameSession != NULL)
 		{
@@ -270,8 +310,6 @@ DWORD WINAPI StartThread(LPVOID lp_params)
 			goto ExitSeq;
 		}
 	}
-
-
 ExitSeq:
 	if (gameSession != NULL)
 	{
@@ -330,7 +368,6 @@ int main(int argc, char* argv[])
 		printf("couldn't create event");
 		return -1;
 	}
-
 	portNumber = (int)strtol(argv[PORT_NUMBER_INDEX], NULL, DECIMAL_BASE);
 	if (portNumber == 0)
 	{
@@ -338,7 +375,6 @@ int main(int argc, char* argv[])
 		return -1;
 	}
 	printf("your port number is: %d\n", portNumber);
-
 	assert(InitializeWSA() == 0);
 	s_server = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
 	if (s_server == INVALID_SOCKET)
@@ -347,7 +383,6 @@ int main(int argc, char* argv[])
 		exit_code = -1;
 		goto ServerCleanUp;
 	}
-
 	address = INADDR_ANY;
 	if (address == INADDR_NONE)
 	{
@@ -355,11 +390,9 @@ int main(int argc, char* argv[])
 		exit_code = -1;
 		goto CloseSocket;
 	}
-
 	service.sin_family = AF_INET;
 	service.sin_addr.s_addr = address;
 	service.sin_port = htons(portNumber);
-
 	//Bind Socket
 	if (bind(s_server, (SOCKADDR*)&service, sizeof(service)) == SOCKET_ERROR)
 	{
@@ -367,7 +400,6 @@ int main(int argc, char* argv[])
 		exit_code = -1;
 		goto CloseSocket;
 	}
-
 	//Listen on Socket
 	if (listen(s_server, SOMAXCONN) == SOCKET_ERROR)
 	{
@@ -375,13 +407,11 @@ int main(int argc, char* argv[])
 		exit_code = -1;
 		goto CloseSocket;
 	}
-
 	for (Ind = 0; Ind < NUM_OF_THREADS; Ind++)
 	{
 		ThreadHandles[Ind] = NULL;
 	}
 	printf("Waiting for a client to connect...\n");
-
 	while (TRUE)
 	{
 		SOCKET AcceptSocket = accept(s_server, NULL, NULL);
@@ -438,4 +468,5 @@ ServerCleanUp:
 	}
 	return exit_code;
 }
+
 #endif
