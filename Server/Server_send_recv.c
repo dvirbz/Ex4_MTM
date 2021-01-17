@@ -1,6 +1,7 @@
 #include "Commune.h"
 #include "Server_send_recv.h"
 #include "File_Func.h"
+
 SERVER_SEND_RECV_H int num_of_writing = -1;
 SERVER_SEND_RECV_H HANDLE ThreadHandles[NUM_OF_THREADS];
 SERVER_SEND_RECV_H HANDLE first_want_to_invite = NULL;
@@ -16,103 +17,99 @@ BOOL no_opponents();
 /* Recv func */
 int recive_client_request(SOCKET s_communication, char* client_response, Player* player)
 {
-	printf("got here\n");
-	if (Recv_Socket(s_communication, client_response, FIFTEEN_SEC) == -1)
+	if (Recv_Socket(s_communication, client_response, FIFTEEN_SEC) != 0)
 	{
 		printf("Recv Failed\n");
-		return -1;
+		return ERROR_CODE;
 
 	}
 	if (GET__Client_Response_ID(client_response) != CLIENT_REQUEST_ID)
 	{
-		printf("Didn't CLIENT_REQUEST_ID\n");
-		return -1;
-	}
-	printf("got here2 client_request: %s\n", client_response);
+		printf("Didn't get CLIENT_REQUEST_ID\n");
+		return ERROR_CODE;
+	}	
 	BnC_Data* data = GET__BnC_Data(client_response);
 	if (data == NULL)
-	{
-		printf("Data Failed\n");
-		return -1;
+	{		
+		return ERROR_CODE;
 	}
 	if (snprintf(player->username, MAX_USERNAME_LEN, "%s", data->first_string) == 0)
 	{
 		free(data);
-		printf("Copy Failed\n");
-		return -1;
+		printf("snprintf Failed\n");
+		return ERROR_CODE;
 	}
 	free(data);
 	player->line_size = strlen(player->username) + strlen(player->move) +
-		3 * strlen(PARTITION_MASSAGE_PARAMETERS) + 2 * strlen(END_PROTOCOL) + BULLS_AND_COWS_STR_LEN;
-	printf("rcr username: %s\n", player->username);
+		3 * strlen(PARTITION_MASSAGE_PARAMETERS) + 2 * strlen(END_PROTOCOL) + BULLS_AND_COWS_STR_LEN;	
 	return 0;
 }
 
 /* Send func */
 int send_approved(SOCKET s_communication, char* server_massage)
 {
-	if (GET__Server_Pro(server_massage, SERVER_APPROVED) == -1)
+	if (GET__Server_Pro(server_massage, SERVER_APPROVED) == ERROR_CODE)
 	{
-		printf("Protocol failed\n");
-		return -1;
+		printf("Protocol failed, snprintf failed\n");
+		return ERROR_CODE;
 	}
-	if (Send_Socket(s_communication, server_massage, strlen(server_massage), FIFTEEN_SEC) == -1)
+	if (Send_Socket(s_communication, server_massage, strlen(server_massage), FIFTEEN_SEC) == ERROR_CODE)
 	{
 		printf("Send Failed\n");
-		return -1;
+		return ERROR_CODE;
 	}
 	return 0;
 }
 int send_server_denied(SOCKET s_communication, char* server_massage)
 {
-	if (GET__Server_Pro(server_massage, SERVER_DENIED) == -1)
+	if (GET__Server_Pro(server_massage, SERVER_DENIED) == ERROR_CODE)
 	{
-		printf("Protocol failed\n");
-		return -1;
+		printf("Protocol failed, snprintf failed\n");
+		return ERROR_CODE;
 	}
-	if (Send_Socket(s_communication, server_massage, strlen(server_massage), FIFTEEN_SEC) == -1)
+	if (Send_Socket(s_communication, server_massage, strlen(server_massage), FIFTEEN_SEC) == ERROR_CODE)
 	{
 		printf("Send Failed\n");
-		return -1;
+		return ERROR_CODE;
 	}
 	return 0;
 }
 int send_main_menu(SOCKET s_communication, char* server_massage)
 {
-	if (GET__Server_Pro(server_massage, SERVER_MAIN_MENU) == -1)
+	if (GET__Server_Pro(server_massage, SERVER_MAIN_MENU) == ERROR_CODE)
 	{
-		printf("Protocol failed\n");
-		return -1;
+		printf("Protocol failed, snprintf failed\n");
+		return ERROR_CODE;
 	}
-	if (Send_Socket(s_communication, server_massage, strlen(server_massage), FIFTEEN_SEC) == -1)
+	if (Send_Socket(s_communication, server_massage, strlen(server_massage), FIFTEEN_SEC) == ERROR_CODE)
 	{
 		printf("Send Failed\n");
-		return -1;
+		return ERROR_CODE;
 	}
 	return 0;
 }
 int send_invite(SOCKET s_communication, char* server_massage, char* other_username)
 {
-	if (GET__Server_Invite_Pro(server_massage, other_username) == -1)
+	if (GET__Server_Invite_Pro(server_massage, other_username) == ERROR_CODE)
 	{
-		printf("Protocol failed\n");
-		return -1;
+		printf("Protocol failed, snprintf failed\n");
+		return ERROR_CODE;
 	}
-	if (Send_Socket(s_communication, server_massage, strlen(server_massage), FIFTEEN_SEC) == -1)
+	if (Send_Socket(s_communication, server_massage, strlen(server_massage), FIFTEEN_SEC) == ERROR_CODE)
 	{
 		printf("Send Failed\n");
-		return -1;
+		return ERROR_CODE;
 	}
 	return 0;
 }
 int send_setup_request(SOCKET s_communication, char* server_massage)
 {
-	if (GET__Server_Pro(server_massage, SERVER_SETUP_REQUEST) == -1)
+	if (GET__Server_Pro(server_massage, SERVER_SETUP_REQUEST) == ERROR_CODE)
 	{
-		printf("Protocol failed\n");
+		printf("Protocol failed, snprintf failed\n");
 		return ERROR_CODE;
 	}
-	if (Send_Socket(s_communication, server_massage, strlen(server_massage), FIFTEEN_SEC) == -1)
+	if (Send_Socket(s_communication, server_massage, strlen(server_massage), FIFTEEN_SEC) == ERROR_CODE)
 	{
 		printf("Send Failed\n");
 		return ERROR_CODE;
@@ -121,15 +118,15 @@ int send_setup_request(SOCKET s_communication, char* server_massage)
 }
 int send_move_request(SOCKET s_communication, char* server_massage)
 {
-	if (GET__Server_Pro(server_massage, SERVER_PLAYER_MOVE_REQUEST) == -1)
+	if (GET__Server_Pro(server_massage, SERVER_PLAYER_MOVE_REQUEST) == ERROR_CODE)
 	{
-		printf("Protocol failed\n");
-		return -1;
+		printf("Protocol failed, snprintf failed\n");
+		return ERROR_CODE;
 	}
-	if (Send_Socket(s_communication, server_massage, strlen(server_massage), FIFTEEN_SEC) == -1)
+	if (Send_Socket(s_communication, server_massage, strlen(server_massage), FIFTEEN_SEC) == ERROR_CODE)
 	{
 		printf("Send Failed\n");
-		return -1;
+		return ERROR_CODE;
 	}
 	return 0;
 }
@@ -137,73 +134,73 @@ int send_game_results(SOCKET s_communication, char* server_massage,
 	Player* other_player, Player* current_player)
 {
 	if (GET__Server_Game_Results_Pro(server_massage, current_player->bulls, current_player->cows,
-		other_player->username, other_player->move) == -1)
+		other_player->username, other_player->move) == ERROR_CODE)
 	{
-		printf("Protocol failed\n");
-		return -1;
+		printf("Protocol failed, snprintf failed\n");
+		return ERROR_CODE;
 	}
-	if (Send_Socket(s_communication, server_massage, strlen(server_massage), FIFTEEN_SEC) == -1)
+	if (Send_Socket(s_communication, server_massage, strlen(server_massage), FIFTEEN_SEC) == ERROR_CODE)
 	{
 		printf("Send Failed\n");
-		return -1;
+		return ERROR_CODE;
 	}
 	return 0;
 }
 int send_game_won(SOCKET s_communication, char* server_massage,
 	Player* other_player, Player* current_player)
 {
-	if (GET__Server_Won_Pro(server_massage, current_player->username, other_player->setup) == -1)
+	if (GET__Server_Won_Pro(server_massage, current_player->username, other_player->setup) == ERROR_CODE)
 	{
-		printf("Protocol failed\n");
-		return -1;
+		printf("Protocol failed, snprintf failed\n");
+		return ERROR_CODE;
 	}
-	if (Send_Socket(s_communication, server_massage, strlen(server_massage), FIFTEEN_SEC) == -1)
+	if (Send_Socket(s_communication, server_massage, strlen(server_massage), FIFTEEN_SEC) == ERROR_CODE)
 	{
 		printf("Send Failed\n");
-		return -1;
+		return ERROR_CODE;
 	}
 	return 0;
 }
 int send_game_draw(SOCKET s_communication, char* server_massage,
 	Player* other_player, Player* current_player)
 {
-	if (GET__Server_Pro(server_massage, SERVER_DRAW) == -1)
+	if (GET__Server_Pro(server_massage, SERVER_DRAW) == ERROR_CODE)
 	{
-		printf("Protocol failed\n");
-		return -1;
+		printf("Protocol failed, snprintf failed\n");
+		return ERROR_CODE;
 	}
-	if (Send_Socket(s_communication, server_massage, strlen(server_massage), FIFTEEN_SEC) == -1)
+	if (Send_Socket(s_communication, server_massage, strlen(server_massage), FIFTEEN_SEC) == ERROR_CODE)
 	{
 		printf("Send Failed\n");
-		return -1;
+		return ERROR_CODE;
 	}
 	return 0;
 }
 int send_server_no_opponents(SOCKET s_communication, char* server_massage)
 {
-	if (GET__Server_Pro(server_massage, SERVER_NO_OPPONENTS) == -1)
+	if (GET__Server_Pro(server_massage, SERVER_NO_OPPONENTS) == ERROR_CODE)
 	{
-		printf("Protocol failed\n");
-		return -1;
+		printf("Protocol failed, snprintf failed\n");
+		return ERROR_CODE;
 	}
-	if (Send_Socket(s_communication, server_massage, strlen(server_massage), FIFTEEN_SEC) == -1)
+	if (Send_Socket(s_communication, server_massage, strlen(server_massage), FIFTEEN_SEC) == ERROR_CODE)
 	{
 		printf("Send Failed\n");
-		return -1;
+		return ERROR_CODE;
 	}
 	return 0;
 }
 int send_opponent_quit(SOCKET s_communication, char* server_massage)
 {
-	if (GET__Server_Pro(server_massage, SERVER_OPPONENT_QUIT) == -1)
+	if (GET__Server_Pro(server_massage, SERVER_OPPONENT_QUIT) == ERROR_CODE)
 	{
-		printf("Protocol failed\n");
-		return -1;
+		printf("Protocol failed, snprintf failed\n");
+		return ERROR_CODE;
 	}
-	if (Send_Socket(s_communication, server_massage, strlen(server_massage), FIFTEEN_SEC) == -1)
+	if (Send_Socket(s_communication, server_massage, strlen(server_massage), FIFTEEN_SEC) == ERROR_CODE)
 	{
 		printf("Send Failed\n");
-		return -1;
+		return ERROR_CODE;
 	}
 	return 0;
 }
@@ -240,8 +237,7 @@ int Handle_setup(SOCKET s_communication, char* client_response, char* server_mas
 	if (opponentQuit[1 - threadNumber] == TRUE)
 	{
 		if (send_server_no_opponents(s_communication, server_massage) == EXIT_CODE)
-		{
-			printf("send setupReq failed!\n");
+		{			
 			return EXIT_CODE;
 		}
 		return SERVER_NO_OPPONENTS_ID;
@@ -250,14 +246,11 @@ int Handle_setup(SOCKET s_communication, char* client_response, char* server_mas
 	{
 		exit_code = send_setup_request(s_communication, server_massage);
 		if (exit_code != 0)
-		{
-			printf("send setupReq failed!\n");
+		{			
 			return exit_code;
 		}
-	}
-	printf("lifnei recv\n");
-	exit_code = Recv_Socket(s_communication, client_response, TEN_MINUTES);
-	printf("ahrei recv\n");
+	}	
+	exit_code = Recv_Socket(s_communication, client_response, TEN_MINUTES);	
 	if (exit_code != 0)
 	{
 		printf("Recv Failed\n");
@@ -266,35 +259,32 @@ int Handle_setup(SOCKET s_communication, char* client_response, char* server_mas
 
 	int clResId = GET__Client_Response_ID(client_response);
 	if (clResId == CLIENT_DISCONNECT_ID)
-	{
-		printf("got CLIENT_DISCONNECT_ID\n");
+	{		
 		return CLIENT_DISCONNECT_ID;
 	}
 	if (clResId != CLIENT_SETUP_ID)
 	{
-		printf("didn't get setup id, got: %s, id: %d\n", client_response, clResId);
+		printf("Expected client setup id, got: %s, id: %d\n", client_response, clResId);
 		return ERROR_CODE;
 	}
 
 	BnC_Data* data = GET__BnC_Data(client_response);
 	if (data == NULL)
-	{
-		printf("can't get BnCdata, got: %s\n", client_response);
+	{		
 		return ERROR_CODE;
 	}
 
 	if (snprintf(current_player->setup, NUM_DIGITIS_GUESS, "%s", data->first_string) == 0)
 	{
-		printf("can't snprintf\n");
+		printf("snprintf failed\n");
 		return ERROR_CODE;
 	}
 	free(data);
 	if (snprintf(current_player->move, NUM_DIGITIS_GUESS, "%s", current_player->setup) == 0)
 	{
-		printf("can't snprintf\n");
+		printf("snprintf failed\n");
 		return ERROR_CODE;
-	}
-	printf("setup opponent quit: %d", opponentQuit[1 - threadNumber]);
+	}	
 	if (write_and_read(gameSession, current_player, other_player, file_lock, threadNumber) != 0)
 	{
 		return ERROR_CODE;
@@ -304,7 +294,6 @@ int Handle_setup(SOCKET s_communication, char* client_response, char* server_mas
 		printf("snprintf failed\n");
 		return ERROR_CODE;
 	}
-	printf("finished handle setup\n");
 	return 0;
 }
 int Handle_move(SOCKET s_communication, char* client_response, char* server_massage,
@@ -313,8 +302,7 @@ int Handle_move(SOCKET s_communication, char* client_response, char* server_mass
 	if (opponentQuit[1 - threadNumber] == TRUE)
 	{
 		if (send_server_no_opponents(s_communication, server_massage) == EXIT_CODE)
-		{
-			printf("send setupReq failed!\n");
+		{		
 			return EXIT_CODE;
 		}
 		return SERVER_NO_OPPONENTS_ID;
@@ -322,8 +310,7 @@ int Handle_move(SOCKET s_communication, char* client_response, char* server_mass
 	else
 	{
 		if (send_move_request(s_communication, server_massage) == EXIT_CODE)
-		{
-			printf("send setupReq failed!\n");
+		{			
 			return EXIT_CODE;
 		}
 	}
@@ -336,26 +323,24 @@ int Handle_move(SOCKET s_communication, char* client_response, char* server_mass
 	}
 	int clResId = GET__Client_Response_ID(client_response);
 	if (clResId == CLIENT_DISCONNECT_ID)
-	{
-		printf("got CLIENT_DISCONNECT_ID\n");
+	{		
 		return CLIENT_DISCONNECT_ID;
 	}
 	if (clResId != CLIENT_PLAYER_MOVE_ID)
 	{
-		printf("didn't get move id, got: %s, id: %d\n", client_response, clResId);
+		printf("Expected client move id, got: %s, id: %d\n", client_response, clResId);
 		return ERROR_CODE;
 	}
 
 	BnC_Data* data = GET__BnC_Data(client_response);
 	if (data == NULL)
-	{
-		printf("can't get BnCdata, got: %s\n", client_response);
+	{		
 		return ERROR_CODE;
 	}
 
 	if (snprintf(current_player->move, NUM_DIGITIS_GUESS, "%s", data->first_string) == 0)
 	{
-		printf("can't snprintf\n");
+		printf("snprintf failed\n");
 		return ERROR_CODE;
 	}
 	free(data);
@@ -390,18 +375,16 @@ int versus_or_disconnect(SOCKET s_communication, HANDLE* gameSession, char* clie
 	if (no_opponents() == TRUE)
 	{
 		if (send_server_no_opponents(s_communication, server_massage) == ERROR_CODE)
-		{
-			printf("couldn't send server no opponents\n");
+		{			
 			return ERROR_CODE;
 		}
 		return SERVER_NO_OPPONENTS_ID;
 	}
 	if (Write__First__Lock__Mutex(file_lock, 15000) == FALSE)
 	{
-		printf("Deadlock first write\n");
+		printf("Reached Deadlock for first write\n");
 		return ERROR_CODE;
-	}
-	printf("trying to open gameSession.txt\n");
+	}	
 	*gameSession = CreateFileA(FILE_GAME_SESSION, GENERIC_READ | GENERIC_WRITE,
 		FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, CREATE_NEW, FILE_ATTRIBUTE_NORMAL, NULL);
 	if (*gameSession == INVALID_HANDLE_VALUE)
@@ -435,26 +418,20 @@ int versus_or_disconnect(SOCKET s_communication, HANDLE* gameSession, char* clie
 	}
 	switch (retVal)
 	{
-	case WAIT_OBJECT_0:
-		printf("wait object zero versus or disco\n");
+	case WAIT_OBJECT_0:		
 		break;
-	case WAIT_FAILED:
-		printf("wait failed versus or disco\n");
+	case WAIT_FAILED:		
 		return ERROR_CODE;
 		break;
-	case WAIT_TIMEOUT:
-		printf("server no opponents versus or disco\n");
+	case WAIT_TIMEOUT:		
 		if (send_server_no_opponents(s_communication, server_massage) == ERROR_CODE)
-		{
-			printf("couldn't send server no opponents\n");
+		{			
 			return ERROR_CODE;
 		}
 		return SERVER_NO_OPPONENTS_ID;
 	}
-
 	if (send_invite(s_communication, server_massage, other_player->username) == ERROR_CODE)
-	{
-		printf("send invite failed!\n");
+	{		
 		return ERROR_CODE;
 	}
 	return 0;
@@ -464,11 +441,9 @@ int first_player_versus(SOCKET s_communication, char* server_massage,
 	HANDLE gameSession, Player* current_player, Player* other_player, Lock* file_lock ,int threadNumber)
 {
 	current_player->is_first_player = TRUE;
-	other_player->is_first_player = FALSE;
-	printf("Im the first player\n");
+	other_player->is_first_player = FALSE;	
 	if (write_to_file(gameSession, current_player, other_player, file_lock) != 0)
 	{
-		printf("failed to write line\n");
 		if (Write__First__Release__Mutex(file_lock) == FALSE)
 		{
 			printf("Coulden't release lock\n");
@@ -495,19 +470,16 @@ int first_player_versus(SOCKET s_communication, char* server_massage,
 	case WAIT_TIMEOUT:
 		if (send_server_no_opponents(s_communication, server_massage) == ERROR_CODE)
 		{
-			printf("couldn't send server no opponents\n");
 			return ERROR_CODE;
 		}
-		printf("waited too long for other opponent to write\n");
+		printf("wait timeout waitedd too long for other opponent to write\n");
 		return SERVER_NO_OPPONENTS_ID;
 	}
 	if (read__line(gameSession, current_player, other_player, file_lock, threadNumber) != 0)
-	{
-		printf("couldn't read line after sleep\n");
+	{		
 		return ERROR_CODE;
 	}
 	return 0;
-
 ReleaseMutex:
 	if (Write__First__Release__Mutex(file_lock) == FALSE)
 	{
@@ -532,13 +504,11 @@ int second_player_versus(HANDLE* gameSession, Player* current_player,
 	current_player->is_first_player = FALSE;
 	other_player->is_first_player = TRUE;
 	if (read__line(*gameSession, current_player, other_player, file_lock, threadNumber) != 0)
-	{
-		printf("failed to read line\n");
+	{		
 		goto ReleaseMutex;
 	}
 	if (write_to_file(*gameSession, current_player, other_player, file_lock) != 0)
-	{
-		printf("failed to write line\n");
+	{		
 		goto ReleaseMutex;
 	}
 	if (Write__First__Release__Mutex(file_lock) == FALSE)
@@ -546,7 +516,6 @@ int second_player_versus(HANDLE* gameSession, Player* current_player,
 		printf("Coulden't release lock\n");
 		return ERROR_CODE;
 	}
-	printf("num_of_writings: %d\n", num_of_writing);
 	num_of_writing++;
 	if (!SetEvent(readAndWriteEvent))
 	{
@@ -568,19 +537,16 @@ BOOL no_opponents()
 	for (int i = 0; i < NUM_OF_THREADS; i++)
 	{
 		if (ThreadHandles[i] == NULL)
-		{
-			printf("we dont have oponents before waitforsingle\n");
+		{		
 			return TRUE;
 		}
 		DWORD Res = WaitForSingleObject(ThreadHandles[i], 0);
 		if (Res == WAIT_OBJECT_0) // this thread finished running
-		{
-			printf("we dont have oponents after waitforsingle\n");
+		{			
 			CloseHandle(ThreadHandles[i]);
 			ThreadHandles[i] = NULL;
 			return TRUE;
 		}
-	}
-	printf("returned false no_opponents\n");
+	}	
 	return FALSE;
 }

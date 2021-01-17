@@ -1,16 +1,5 @@
 #include "Player.h"
 
-void print_player(Player* player)
-{
-	printf("player name is: %s\n", player->username);
-	printf("player setup is: %s\n", player->setup);
-	printf("player move is: %s\n", player->move);
-	printf("player line size: %d\n", player->line_size);
-	printf("player is the first player? %d\n", player->is_first_player);
-	printf("player bulls: %d\n", player->bulls);
-	printf("player cows: %d\n", player->cows);
-}
-
 int init_player(Player* player)
 {
 	printf("initializing player...\n");
