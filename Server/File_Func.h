@@ -9,8 +9,8 @@
 
 int write_to_file(HANDLE gameSession, Player* current_player, Player* other_player, Lock* file_lock);
 
-int read__line(HANDLE gameSession, Player* current_player, Player* other_player, Lock* file_lock);
+int read__line(HANDLE gameSession, Player* current_player, Player* other_player, Lock* file_lock, BOOL opponentQuit);
 
-int write_and_read(HANDLE gameSession, Player* current_player, Player* other_player, Lock* file_lock);
+int write_and_read(HANDLE gameSession, Player* current_player, Player* other_player, Lock* file_lock, BOOL opponentQuit);
 int update_data_from_file(Player* other_player, Player* current_player, char* player_info);
 #endif

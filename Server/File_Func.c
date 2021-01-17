@@ -58,9 +58,9 @@ int write_to_file(HANDLE gameSession, Player* current_player, Player* other_play
 	return 0;
 }
 /*Read the player data line from the appropriate line in the file */
-int read__line(HANDLE gameSession, Player* current_player, Player* other_player, Lock* file_lock)
+int read__line(HANDLE gameSession, Player* current_player, Player* other_player, Lock* file_lock, BOOL opponentQuit)
 {
-	while ((num_of_writing % 2) != 0);
+	while ((num_of_writing % 2) != 0 && opponentQuit == FALSE);
 	if (Read__Lock(file_lock, 5000) == FALSE)
 	{
 		printf("Could't lock in 5 sec\n");
@@ -97,7 +97,7 @@ int read__line(HANDLE gameSession, Player* current_player, Player* other_player,
 	return 0;
 }
 
-int write_and_read(HANDLE gameSession, Player* current_player, Player* other_player, Lock* file_lock)
+int write_and_read(HANDLE gameSession, Player* current_player, Player* other_player, Lock* file_lock, BOOL opponentQuit)
 {
 	if (write_to_file(gameSession, current_player, other_player, file_lock) == -1)
 	{
@@ -105,7 +105,7 @@ int write_and_read(HANDLE gameSession, Player* current_player, Player* other_pla
 		return -1;
 	}
 
-	if (read__line(gameSession, current_player, other_player, file_lock) == -1)
+	if (read__line(gameSession, current_player, other_player, file_lock, opponentQuit) == -1)
 	{
 		printf("can't read from file\n");
 		return -1;

@@ -2,23 +2,21 @@
 #ifndef WIN32_LEAN_AND_MEAN
 #define WIN32_LEAN_AND_MEAN
 #pragma comment(lib, "Ws2_32.lib")
-
 #include <assert.h>
 #include <string.h>
 #include <stdio.h>
-#include <time.h>
-#include <errno.h>
 #include <stdlib.h>
 #include <windows.h>
 #include <winsock2.h>
 #include <ws2tcpip.h>
-
 #include "Commune.h"
 #include "Lock.h"
 #include "Player.h"
 #include "File_Func.h"
 #include "Server_send_recv.h"
 #include "HardCodedData.h"
+#include <stdbool.h>
+
 
 /*Thread structer and global param*/
 typedef struct {
@@ -28,10 +26,11 @@ typedef struct {
 	HANDLE readAndWriteEvent;
 }ThreadParams;
 
-ThreadParams ThreadInputs[NUM_OF_THREADS];
-int can_I_close_file = 0;
 HANDLE ThreadToBeClosed;
+ThreadParams ThreadInputs[NUM_OF_THREADS];
 ThreadParams ServerDeniedThreadInputs;
+BOOL opponentQuit[NUM_OF_THREADS] = { FALSE, FALSE };
+int can_I_close_file = 0;
 
 int InitializeWSA()
 {
@@ -115,13 +114,24 @@ int FindFirstUnusedThreadSlot()
 }
 
 int Game(SOCKET s_communication, char* client_response, char* server_massage, Player * current_player,
-	Player* other_player, HANDLE gameSession, Lock * file_lock)
+	Player* other_player, HANDLE gameSession, Lock * file_lock, int threadNumber)
 {
 	int play_status = 0;
 	while (play_status == 0)
 	{
+		BOOL opQuit = opponentQuit[1 - threadNumber];
+		if (opQuit == TRUE)
+		{
+			if (send_opponent_quit(s_communication, server_massage) == ERROR_CODE)
+			{
+				printf("can't send opponent quit\n");
+				return ERROR_CODE;
+			}
+			printf("sent opponent quit.\n");
+			return SERVER_OPPONENT_QUIT_ID;
+		}
 		if (Handle_move(s_communication, client_response, server_massage,
-			current_player, other_player, gameSession, file_lock) == -1)
+			current_player, other_player, gameSession, file_lock, opQuit) == -1)
 		{
 			printf("can't handle move\n");
 			return ERROR_CODE;
@@ -140,7 +150,7 @@ int Game(SOCKET s_communication, char* client_response, char* server_massage, Pl
 			printf("can't write to file\n");
 			return ERROR_CODE;
 		}
-		if (read__line(gameSession, current_player, other_player, file_lock) != 0)
+		if (read__line(gameSession, current_player, other_player, file_lock, opponentQuit[1 - threadNumber]) != 0)
 		{
 			printf("can't read from file\n");
 			return ERROR_CODE;
@@ -174,37 +184,172 @@ int Game(SOCKET s_communication, char* client_response, char* server_massage, Pl
 	return 0;
 }
 
-int Pre_Game(SOCKET s_communication, char* client_response, char* server_massage, Player* current_player,
-	Player* other_player, HANDLE *gameSession, Lock* file_lock)
+DWORD WINAPI StartThread(LPVOID lp_params)
 {
-	int exit_code = 0;
-	exit_code = send_main_menu(s_communication, server_massage);
-	if (exit_code == ERROR_CODE)
-		goto ExitSeq;
-	switch (versus_or_disconnect(s_communication, gameSession, client_response,
-		server_massage, current_player, other_player, file_lock))
+	ThreadParams threadInput = *(ThreadParams*)lp_params;
+	Lock* file_lock = threadInput.file_lock;
+	SOCKET s_communication = threadInput.ClientSocket;
+	HANDLE gameSession = NULL;
+
+	opponentQuit[threadInput.ThreadNumber] = FALSE;
+	int exit_code = 0, distance_to_move = 0;
+	char* server_massage = (char*)calloc(MAX_PRO_LEN, sizeof(char));
+	if (server_massage == NULL)
 	{
-	case ERROR_CODE:
-		exit_code = RESET_GAME;
-		goto ExitSeq;
-	case CLIENT_DISCONNECT_ID:
-		exit_code = CLIENT_DISCONNECT_ID;
-		goto ExitSeq;
-		break;
-	case SERVER_NO_OPPONENTS_ID:
-		exit_code = SERVER_NO_OPPONENTS_ID;
-		goto ExitSeq;
-		break;
+		printf("cant malloc server massage\n");
+		exit_code = -1;
+		goto Exit_No_Free;
+	}
+	char* client_response = (char*)calloc(MAX_PRO_LEN, sizeof(char));
+	if (client_response == NULL)
+	{
+		printf("cant malloc client response\n");
+		exit_code = -1;
+		goto ExitFreeServer;
 	}
 
-	if (Handle_setup(s_communication, client_response, server_massage, current_player,
-		other_player, *gameSession, file_lock) == -1)
+	Player* current_player = (Player*)calloc(1, sizeof(Player));
+	if (current_player == NULL)
 	{
-		printf("can't handle setup\n");
-		exit_code = RESET_GAME;
-		goto ExitSeq;
+		printf("cant malloc current player\n");
+		exit_code = -1;
+		goto ExitFreeServerClient;
 	}
+	Player* other_player = (Player*)calloc(1, sizeof(Player));
+	if (other_player == NULL)
+	{
+		printf("cant malloc other player\n");
+		exit_code = -1;
+		goto ExitFreeServerClientPlayer;
+	}
+	exit_code = init_playeres(current_player, other_player);
+	if (exit_code != 0)
+		goto ExitSeq;
+
+	exit_code = Handle_Client_Request_Approved(s_communication, client_response, server_massage, current_player);
+	if (exit_code != 0)
+		goto ExitSeq;
+	int pre_game_code = 0;
+	while (TRUE)
+	{
+	MainMenu:
+		exit_code = send_main_menu(s_communication, server_massage);
+		if (exit_code == ERROR_CODE)
+			goto ExitSeq;
+		switch (versus_or_disconnect(s_communication, &gameSession, client_response,
+			server_massage, current_player, other_player, file_lock))
+		{
+		case ERROR_CODE:
+			exit_code = ERROR_CODE;
+			goto ResetGame;
+		case CLIENT_DISCONNECT_ID:
+			exit_code = CLIENT_DISCONNECT_ID;
+			goto ExitSeq;
+			break;
+		case SERVER_NO_OPPONENTS_ID:
+			exit_code = 0;
+			goto MainMenu;
+			break;
+		}
+		exit_code = Handle_setup(s_communication, client_response, server_massage, current_player,
+			other_player, gameSession, file_lock, opponentQuit[1- threadInput.ThreadNumber]);
+		if (exit_code != 0)
+		{
+			printf("can't handle setup\n");
+			goto ResetGame;
+		}
+		/*pre_game_code = Pre_Game(s_communication, client_response, server_massage, current_player,
+			other_player, &gameSession, file_lock);
+		switch (pre_game_code)
+		{
+		case ERROR_CODE:
+			exit_code = ERROR_CODE;
+			goto ExitSeq;
+		case RESET_GAME:
+			exit_code = ERROR_CODE;
+			goto ResetGame;
+		case CLIENT_DISCONNECT_ID:
+			exit_code = CLIENT_DISCONNECT_ID;
+			goto ExitSeq;
+		case SERVER_NO_OPPONENTS_ID:
+			exit_code = 0;
+			goto MainMenu;
+		default:
+			break;
+		}*/
+		exit_code = Game(s_communication, client_response, server_massage, current_player,
+			other_player, gameSession, file_lock, threadInput.ThreadNumber);
+	ResetGame:
+		if (exit_code == CLIENT_DISCONNECT_ID)
+		{
+			opponentQuit[threadInput.ThreadNumber] = TRUE;
+			num_of_writing++;
+		}
+		printf("entered resetgame\n");
+		if (gameSession != NULL)
+		{
+			CloseHandle(gameSession);
+			can_I_close_file++;
+		}
+		gameSession = NULL;
+		if (current_player->is_first_player == TRUE)//CloseFile
+		{
+			while (can_I_close_file % 2 != 0);
+			if (DeleteFileA(FILE_GAME_SESSION) == 0)
+			{
+				printf("error: %d\n", GetLastError());
+			}
+			num_of_writing = -1;
+		}
+
+		ResetEvent(readAndWriteEvent);
+		if (current_player->is_first_player == TRUE)
+		{
+			ResetEvent(first_want_to_invite);
+		}
+		else
+		{
+			ResetEvent(second_want_to_invite);
+		}
+		if (exit_code == ERROR_CODE || exit_code == SHUTDOWN)
+		{
+			goto ExitSeq;
+		}
+		if (exit_code == SERVER_OPPONENT_QUIT_ID)
+		{
+			printf("got into server opponent quit id");
+			exit_code = 0;
+			goto MainMenu;
+		}
+	}
+
 ExitSeq:
+	printf("entered ExitSeq\n");
+	opponentQuit[threadInput.ThreadNumber] = TRUE;
+	if (gameSession != NULL)
+	{
+		CloseHandle(gameSession);
+		can_I_close_file++;
+	}
+
+	free(other_player);
+ExitFreeServerClientPlayer:
+	free(current_player);
+	shutdown(s_communication, SD_SEND);
+	while (exit_code != SHUTDOWN)
+	{
+		exit_code = Recv_Socket(s_communication, client_response, FIFTEEN_SEC);
+	}
+ExitFreeServerClient:
+	free(client_response);
+ExitFreeServer:
+	free(server_massage);
+Exit_No_Free:
+	if (closesocket(s_communication) == SOCKET_ERROR)
+	{
+		printf("Failed to close MainSocketThread, error %ld. Ending program\n", WSAGetLastError());
+	}
+	printf("player quit\n");
 	return exit_code;
 }
 
@@ -238,9 +383,7 @@ DWORD WINAPI ServerDeniedThread(LPVOID lp_params)
 	}
 
 	exit_code = Handle_Client_Request_Denied(s_communication, client_response, server_massage, current_player);
-	free(current_player);
-	shutdown(s_communication, SD_SEND);
-	while (Recv_Socket(s_communication, client_response, FIFTEEN_SEC) != SHUTDOWN);
+
 ExitFreeServerClient:
 	free(client_response);
 ExitFreeServer:
@@ -250,148 +393,16 @@ Exit_No_Free:
 	{
 		printf("Failed to close MainSocketThread, error %ld. Ending program\n", WSAGetLastError());
 	}
-	return exit_code;
-}
-
-DWORD WINAPI StartThread(LPVOID lp_params)
-{
-	ThreadParams threadInput = *(ThreadParams*)lp_params;
-	Lock* file_lock = threadInput.file_lock;
-	SOCKET s_communication = threadInput.ClientSocket;
-	HANDLE gameSession = NULL;
-
-	int exit_code = 0, distance_to_move = 0;
-	char* server_massage = (char*)calloc(MAX_PRO_LEN, sizeof(char));
-	if (server_massage == NULL)
-	{
-		printf("cant malloc server massage\n");
-		exit_code = -1;
-		goto Exit_No_Free;
-	}
-	char* client_response = (char*)calloc(MAX_PRO_LEN, sizeof(char));
-	if (client_response == NULL)
-	{
-		printf("cant malloc client response\n");
-		exit_code = -1;
-		goto ExitFreeServer;
-	}
-
-	Player* current_player = (Player*)calloc(1, sizeof(Player));
-	if (current_player == NULL)
-	{
-		printf("cant malloc current player\n");
-		exit_code = -1;
-		goto ExitFreeServerClient;
-	}
-	Player* other_player = (Player*)calloc(1, sizeof(Player));
-	if (other_player == NULL)
-	{
-		printf("cant malloc other player\n");
-		exit_code = -1;
-		goto ExitFreeServerClientPlayer;
-	}
-	exit_code = init_playeres(current_player,other_player);
-	if (exit_code != 0)
-		goto ExitSeq;	
-
-	exit_code = Handle_Client_Request_Approved(s_communication, client_response, server_massage, current_player);
-	if (exit_code != 0)
-		goto ExitSeq;
-	int pre_game_code = 0;
-	while (TRUE)
-	{
-	MainMenu:		
-		exit_code = send_main_menu(s_communication, server_massage);
-		if (exit_code == ERROR_CODE)
-			goto ExitSeq;
-		switch (versus_or_disconnect(s_communication, &gameSession, client_response,
-			server_massage, current_player, other_player, file_lock))
-		{
-		case ERROR_CODE:
-			exit_code = ERROR_CODE;
-			goto ResetGame;
-		case CLIENT_DISCONNECT_ID:
-			exit_code = CLIENT_DISCONNECT_ID;
-			goto ExitSeq;
-			break;
-		case SERVER_NO_OPPONENTS_ID:
-			exit_code = 0;
-			goto MainMenu;
-			break;
-		}
-		if (Handle_setup(s_communication, client_response, server_massage, current_player,
-			other_player, gameSession, file_lock) == -1)
-		{
-			printf("can't handle setup\n");
-			exit_code = ERROR_CODE;
-			goto ExitSeq;
-		}		
-		exit_code = Game(s_communication, client_response, server_massage, current_player,
-			other_player, gameSession, file_lock);
-	ResetGame:
-		if (gameSession != NULL)
-		{
-			CloseHandle(gameSession);
-			can_I_close_file++;
-		}
-		gameSession = NULL;
-		if (current_player->is_first_player == TRUE)//CloseFile
-		{
-			while (can_I_close_file % 2 != 0);
-			if (DeleteFileA(FILE_GAME_SESSION) == 0)
-			{
-				printf("error: %d\n", GetLastError());
-			}
-			num_of_writing = -1;
-		}
-		ResetEvent(readAndWriteEvent);
-		if (current_player->is_first_player == TRUE)
-		{
-			ResetEvent(first_want_to_invite);
-		}
-		else
-		{
-			ResetEvent(second_want_to_invite);
-		}
-		if (exit_code == ERROR_CODE)
-		{
-			goto ExitSeq;
-		}
-	}
-ExitSeq:
-	if (gameSession != NULL)
-	{
-		CloseHandle(gameSession);
-		can_I_close_file++;
-	}	
-	free(other_player);
-ExitFreeServerClientPlayer:
-	free(current_player);
-	shutdown(s_communication, SD_SEND);
-	while (exit_code != SHUTDOWN)
-	{
-		exit_code = Recv_Socket(s_communication, client_response, FIFTEEN_SEC);
-	}
-ExitFreeServerClient:
-	free(client_response);
-ExitFreeServer:
-	free(server_massage);
-Exit_No_Free:
-	if (closesocket(s_communication) == SOCKET_ERROR)
-	{
-		printf("Failed to close MainSocketThread, error %ld. Ending program\n", WSAGetLastError());
-	}
-	printf("player quit\n");
 	return exit_code;
 }
 
 DWORD WINAPI ExitMainThread(char* exit_string)
 {
 	printf("Start checking for exit\n");
-	while (strcmp(exit_string,"exit") != 0)
+	while (strcmp(exit_string, "exit") != 0)
 	{
 		printf("%s\n", exit_string);
-		scanf_s("%s", exit_string, EXIT_STRING_LEN);	
+		scanf_s("%s", exit_string, EXIT_STRING_LEN);
 		printf("%s\n", exit_string);
 	}
 	printf("End checking for exit\n");
@@ -404,7 +415,7 @@ int main(int argc, char* argv[])
 
 	int Ind, exit_code = 0, portNumber;
 	int max_sd, activity;
-	SOCKET s_server = INVALID_SOCKET;	
+	SOCKET s_server = INVALID_SOCKET;
 	SOCKADDR_IN service;
 	fd_set readfds;
 	Lock* file_lock = New__Lock(NUM_OF_THREADS);
@@ -449,7 +460,7 @@ int main(int argc, char* argv[])
 		printf("Error at socket( ): %ld\n", WSAGetLastError());
 		exit_code = -1;
 		goto ServerCleanUp;
-	}	
+	}
 	service.sin_family = AF_INET;
 	service.sin_addr.s_addr = INADDR_ANY;
 	service.sin_port = htons(portNumber);
@@ -471,14 +482,14 @@ int main(int argc, char* argv[])
 	{
 		ThreadHandles[Ind] = NULL;
 	}
-	char* exit_message = (char*)calloc(5, sizeof(char));
+	char* exit_message = (char*)calloc(EXIT_STRING_LEN, sizeof(char));
 	if (exit_message == NULL)
 	{
 		printf("MEM allocation failed\n");
 		exit_code = ERROR_CODE;
 		goto CloseSocket;
 	}
-	if (snprintf(exit_message, 5, "game") == 0)
+	if (snprintf(exit_message, EXIT_STRING_LEN, "game") == 0)
 	{
 		printf("snprintf failed\n");
 		exit_code = ERROR_CODE;
@@ -507,18 +518,18 @@ int main(int argc, char* argv[])
 	{
 		FD_ZERO(&readfds);
 		FD_SET(s_server, &readfds);
-		max_sd = s_server;		
+		max_sd = s_server;
 		activity = select(max_sd + 1, &readfds, NULL, NULL, &wait_time);
 
 		if ((activity < 0) && (errno != EINTR))
 		{
 			printf("select error");
-		}		
+		}
 		if (activity > 0)
 		{
-		
+
 			if (FD_ISSET(s_server, &readfds))
-			{				
+			{
 				SOCKET AcceptSocket = accept(s_server, NULL, NULL);
 				if (AcceptSocket == INVALID_SOCKET)
 				{
@@ -557,13 +568,13 @@ int main(int argc, char* argv[])
 				}
 			}
 		}
-		exit_retval = WaitForSingleObject(thread_exit, 0);		
+		exit_retval = WaitForSingleObject(thread_exit, 0);
 		if (exit_retval == WAIT_OBJECT_0)
 		{
 			break;
 		}
-	
-	}	
+
+	}
 	printf("end");
 	CleanupWorkerThreads();
 CloseSocket:
@@ -580,8 +591,7 @@ ServerCleanUp:
 	if (WSACleanup() == SOCKET_ERROR)
 	{
 		printf("Failed to close WinsocketServer, error %ld. Ending program.\n", WSAGetLastError());
-	}	
+	}
 	return exit_code;
 }
-
 #endif
