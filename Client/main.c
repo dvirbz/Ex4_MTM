@@ -256,7 +256,7 @@ int Game_Guess(Game_Status guess_status,SOCKET s_client, char* server_response,
 			printf("Choose your guess:\n");
 			if (scanf_s("%s", guess_seq, NUM_DIGITIS_GUESS) == 0)
 			{
-				printf("oof");
+				printf("scanf failed, either too many chars or another problem\n");
 				return ERROR_CODE;
 				
 			}
@@ -278,7 +278,7 @@ int Game_Guess(Game_Status guess_status,SOCKET s_client, char* server_response,
 			{
 				return SHUTDOWN;
 			}
-			printf("SERVER_PLAYER_MOVE_REQUEST_ID pro: %s server_res_id: %d\n",server_response, server_res_id);
+			printf("Expected SERVER_PLAYER_MOVE_REQUEST_ID got pro:  %s server_res_id:  %d\n",server_response, server_res_id);
 			return ERROR_CODE;
 		}
 		server_res_id = GET__Server_Response(s_client, server_response, TEN_MINUTES);
@@ -309,7 +309,7 @@ int Game_Guess(Game_Status guess_status,SOCKET s_client, char* server_response,
 		case SHUTDOWN:
 			free(data);
 			return SHUTDOWN;
-		default:printf("SERVER_GAME_RESULTS_ID pro: %s id: %d\n", server_response, server_res_id);
+		default:printf("Expected SERVER_GAME_RESULTS_ID got pro: %s id: %d\n", server_response, server_res_id);
 			free(data); 
 			return ERROR_CODE;
 			break;
@@ -326,13 +326,12 @@ int Game_Setup(Game_Status guess_status, SOCKET s_client, char* server_response,
 		printf("Choose your 4 digits:\n");
 		if (scanf_s("%s", guess_seq, NUM_DIGITIS_GUESS) == 0)
 		{
-			printf("oof");
+			printf("scanf failed, either too many chars or another problem\n");
 			return ERROR_CODE;
 		}
-		fflush(stdin);
-		printf("setup: %s\n", guess_seq);
+		fflush(stdin);		
 		if (Handle_Client_Setup(s_client, client_message, guess_seq) == ERROR_CODE)
-		{
+		{			
 			return ERROR_CODE;
 		}
 	}
@@ -347,7 +346,7 @@ int Game_Setup(Game_Status guess_status, SOCKET s_client, char* server_response,
 		{
 			return SHUTDOWN;
 		}
-		printf("SERVER_SETUP_REQUEST_ID pro: %s server_res_id: %d\n",server_response, server_res_id);
+		printf("Expected SERVER_SETUP_REQUEST_ID got pro: %s server_res_id: %d\n",server_response, server_res_id);
 		return ERROR_CODE;
 	}
 	return GUESS;
@@ -369,12 +368,12 @@ int Game(Player_Status play_status, Game_Status guess_status, SOCKET s_client, c
 			play_status = MENU;
 			break;
 		case SHUTDOWN:
-			printf("SERVER_NO_OPPONENTS_ID SERVER_INVITE_ID pro: %s id: %d\n", server_response, server_res_id);
+			printf("Expected SERVER_NO_OPPONENTS_ID or SERVER_INVITE_ID got pro: %s id: %d\n", server_response, server_res_id);
 			return SHUTDOWN;
 		case SERVER_OPPONENT_QUIT_ID:
 			play_status = MENU;
 			break;
-		default:printf("SERVER_NO_OPPONENTS_ID SERVER_INVITE_ID pro: %s id: %d\n", server_response, server_res_id);
+		default:printf("Expected SERVER_NO_OPPONENTS_ID SERVER_INVITE_ID got pro: %s id: %d\n", server_response, server_res_id);
 			return ERROR_CODE;
 			break;
 		}
@@ -439,8 +438,7 @@ int Connect(SOCKET s_client, SOCKADDR_IN clientService, char* server_response,in
 			/* Client Request */
 		int retval_client_request = Handle_Client_Request(s_client, username, client_message);
 		if (retval_client_request == ERROR_CODE || retval_client_request == SHUTDOWN)
-		{
-			printf("retval_client_request: %d\n", retval_client_request);
+		{			
 			return retval_client_request;
 		}
 		
@@ -486,7 +484,7 @@ int Handle_Client_Request(SOCKET s_client, char* username, char * client_message
 	int client_mes_size = strlen(CLIENT_REQUEST) + strlen(END_PROTOCOL) + strlen(username) + 1;
 	if (GET__CLIENT_REQUEST_PRO(client_message, username) == ERROR_CODE)
 	{
-		printf("Protocol failed\n");		
+		printf("Protocol failed, snprintf failed\n");
 		return ERROR_CODE;
 	}
 	if (Send_Socket(s_client, client_message, client_mes_size, FIFTEEN_SEC) == ERROR_CODE)
@@ -500,7 +498,7 @@ int Handle_Client_Disconnect(SOCKET s_client, char* client_message) {
 	int client_mes_size = strlen(CLIENT_DISCONNECT) + strlen(END_PROTOCOL);
 	if (GET__CLIENT_DISCONNECT_PRO(client_message) == ERROR_CODE)
 	{
-		printf("Protocol failed\n");
+		printf("Protocol failed, snprintf failed\n");
 		return ERROR_CODE;
 	}
 	if (Send_Socket(s_client, client_message, client_mes_size, FIFTEEN_SEC) == ERROR_CODE)
@@ -514,7 +512,7 @@ int Handle_Client_Versus(SOCKET s_client, char* client_message) {
 	int client_mes_size = strlen(CLIENT_VERSUS) + strlen(END_PROTOCOL);
 	if (GET__CLIENT_VERSUS_PRO(client_message) == ERROR_CODE)
 	{
-		printf("Protocol failed\n");
+		printf("Protocol failed, snprintf failed\n");
 		return ERROR_CODE;
 	}
 	if (Send_Socket(s_client, client_message, client_mes_size, FIFTEEN_SEC) == -1)
@@ -528,7 +526,7 @@ int Handle_Client_Setup(SOCKET s_client, char* client_message, char* setup_seq) 
 	int client_mes_size = strlen(CLIENT_SETUP) + strlen(END_PROTOCOL) + strlen(setup_seq) +1;
 	if (GET__CLIENT_SETUP_PRO(client_message, setup_seq) == ERROR_CODE)
 	{
-		printf("Protocol failed\n");
+		printf("Protocol failed, snprintf failed\n");
 		return ERROR_CODE;
 	}
 	if (Send_Socket(s_client, client_message, client_mes_size, FIFTEEN_SEC) == ERROR_CODE)
@@ -543,7 +541,7 @@ int Handle_Client_Player_Move(SOCKET s_client, char* client_message, char* guess
 	int client_mes_size = strlen(CLIENT_PLAYER_MOVE) + strlen(END_PROTOCOL) + strlen(guess_seq) + 1;
 	if (GET__CLIENT_PLAYER_MOVE_PRO(client_message, guess_seq) == ERROR_CODE)
 	{
-		printf("Protocol failed\n");
+		printf("Protocol failed, snprintf failed\n");
 		return ERROR_CODE;
 	}
 	if (Send_Socket(s_client, client_message, client_mes_size, FIFTEEN_SEC) == ERROR_CODE)
@@ -572,7 +570,7 @@ int Handle_Server_Main_Menu(SOCKET s_client, char* server_response,
 	}
 	else
 	{
-		printf("SERVER_MAIN_MENU_ID pro: %s id: %d\n", server_response, server_res_id);
+		printf("Expected SERVER_MAIN_MENU_ID got pro:  %s id: %d\n", server_response, server_res_id);
 		if (server_res_id == SHUTDOWN)
 		{			
 			return SHUTDOWN;
