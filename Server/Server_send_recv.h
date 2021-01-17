@@ -28,7 +28,7 @@ int send_game_won(SOCKET s_communication, char* server_massage,
 int send_game_draw(SOCKET s_communication, char* server_massage,
 	Player* other_player, Player* current_player);
 int send_server_no_opponents(SOCKET s_communication, char* server_massage);
-int send_opponent_quit(s_communication, server_massage);
+int send_opponent_quit(SOCKET s_communication, char* server_massage);
 
 /* Send and Recv func */
 int Handle_Client_Request_Approved(SOCKET s_communication, char* client_response, char* server_massage,
@@ -36,11 +36,11 @@ int Handle_Client_Request_Approved(SOCKET s_communication, char* client_response
 int Handle_Client_Request_Denied(SOCKET s_communication, char* client_response, char* server_massage,
 	Player* current_player);
 int Handle_setup(SOCKET s_communication, char* client_response, char* server_massage,
-	Player* current_player, Player* other_player, HANDLE gameSession, Lock* file_lock, BOOL opponentQuit);
+	Player* current_player, Player* other_player, HANDLE gameSession, Lock* file_lock, int threadNumber);
 int Handle_move(SOCKET s_communication, char* client_response, char* server_massage,
-	Player* current_player, Player* other_player, HANDLE gameSession, Lock* file_lock, BOOL opponentQuit);
+	Player* current_player, Player* other_player, HANDLE gameSession, Lock* file_lock, int threadNumber);
 int versus_or_disconnect(SOCKET s_communication, HANDLE* gameSession, char* client_response,
-	char* server_massage, Player* current_player, Player* other_player, Lock* file_lock);
+	char* server_massage, Player* current_player, Player* other_player, Lock* file_lock, int threadNumber);
 
 
 #endif

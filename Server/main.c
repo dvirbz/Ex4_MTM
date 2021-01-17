@@ -29,8 +29,8 @@ typedef struct {
 HANDLE ThreadToBeClosed;
 ThreadParams ThreadInputs[NUM_OF_THREADS];
 ThreadParams ServerDeniedThreadInputs;
-BOOL opponentQuit[NUM_OF_THREADS] = { FALSE, FALSE };
-int can_I_close_file = 0;
+
+int can_I_delete_file = 0;
 
 int InitializeWSA()
 {
@@ -119,8 +119,7 @@ int Game(SOCKET s_communication, char* client_response, char* server_massage, Pl
 	int play_status = 0;
 	while (play_status == 0)
 	{
-		BOOL opQuit = opponentQuit[1 - threadNumber];
-		if (opQuit == TRUE)
+		if (opponentQuit[1 - threadNumber] == TRUE)
 		{
 			if (send_opponent_quit(s_communication, server_massage) == ERROR_CODE)
 			{
@@ -132,7 +131,7 @@ int Game(SOCKET s_communication, char* client_response, char* server_massage, Pl
 		}
 		int exit_code = 0;
 		exit_code = Handle_move(s_communication, client_response, server_massage,
-			current_player, other_player, gameSession, file_lock, opQuit);
+			current_player, other_player, gameSession, file_lock, threadNumber);
 		if(exit_code != 0)
 		{
 			printf("can't handle move\n");
@@ -152,7 +151,7 @@ int Game(SOCKET s_communication, char* client_response, char* server_massage, Pl
 			printf("can't write to file\n");
 			return ERROR_CODE;
 		}
-		if (read__line(gameSession, current_player, other_player, file_lock, opponentQuit[1 - threadNumber]) != 0)
+		if (read__line(gameSession, current_player, other_player, file_lock, threadNumber) != 0)
 		{
 			printf("can't read from file\n");
 			return ERROR_CODE;
@@ -193,7 +192,6 @@ DWORD WINAPI StartThread(LPVOID lp_params)
 	SOCKET s_communication = threadInput.ClientSocket;
 	HANDLE gameSession = NULL;
 
-	opponentQuit[threadInput.ThreadNumber] = FALSE;
 	int exit_code = 0, distance_to_move = 0;
 	char* server_massage = (char*)calloc(MAX_PRO_LEN, sizeof(char));
 	if (server_massage == NULL)
@@ -239,7 +237,7 @@ DWORD WINAPI StartThread(LPVOID lp_params)
 		if (exit_code == ERROR_CODE)
 			goto ExitSeq;
 		switch (versus_or_disconnect(s_communication, &gameSession, client_response,
-			server_massage, current_player, other_player, file_lock))
+			server_massage, current_player, other_player, file_lock, threadInput.ThreadNumber))
 		{
 		case ERROR_CODE:
 			exit_code = ERROR_CODE;
@@ -252,54 +250,38 @@ DWORD WINAPI StartThread(LPVOID lp_params)
 			exit_code = 0;
 			goto ResetGame;
 			break;
+		case SHUTDOWN:
+			exit_code = ERROR_CODE;
+			goto ResetGame;
 		}
+
 		exit_code = Handle_setup(s_communication, client_response, server_massage, current_player,
-			other_player, gameSession, file_lock, opponentQuit[1- threadInput.ThreadNumber]);
+			other_player, gameSession, file_lock, opponentQuit[1 - threadInput.ThreadNumber]);
 		if (exit_code != 0)
 		{
-			printf("can't handle setup\n");
+			printf("can't handle setup, exitcode = %d\n", exit_code);
 			goto ResetGame;
 		}
-		/*pre_game_code = Pre_Game(s_communication, client_response, server_massage, current_player,
-			other_player, &gameSession, file_lock);
-		switch (pre_game_code)
-		{
-		case ERROR_CODE:
-			exit_code = ERROR_CODE;
-			goto ExitSeq;
-		case RESET_GAME:
-			exit_code = ERROR_CODE;
-			goto ResetGame;
-		case CLIENT_DISCONNECT_ID:
-			exit_code = CLIENT_DISCONNECT_ID;
-			goto ExitSeq;
-		case SERVER_NO_OPPONENTS_ID:
-			exit_code = 0;
-			goto MainMenu;
-		default:
-			break;
-		}*/
 		exit_code = Game(s_communication, client_response, server_massage, current_player,
 			other_player, gameSession, file_lock, threadInput.ThreadNumber);
 	ResetGame:
-		if (exit_code == CLIENT_DISCONNECT_ID)
+		if (exit_code != 0)
 		{
 			opponentQuit[threadInput.ThreadNumber] = TRUE;
 			num_of_writing++;
 		}
-		printf("entered resetgame\n");
 		if (gameSession != NULL)
 		{
 			CloseHandle(gameSession);
-			can_I_close_file++;
+			can_I_delete_file++;
 		}
 		gameSession = NULL;
 		if (current_player->is_first_player == TRUE)//CloseFile
 		{
-			while (can_I_close_file % 2 != 0 && opponentQuit[1 - threadInput.ThreadNumber] == FALSE);
-			if (can_I_close_file % 2 != 0)
+			while (can_I_delete_file % 2 != 0 );
+			if (can_I_delete_file % 2 != 0)
 			{
-				can_I_close_file++;
+				can_I_delete_file++;
 			}
 			if (DeleteFileA(FILE_GAME_SESSION) == 0)
 			{
@@ -334,9 +316,12 @@ ExitSeq:
 	if (gameSession != NULL)
 	{
 		CloseHandle(gameSession);		
-		can_I_close_file++;
+		can_I_delete_file++;
 	}	
 	opponentQuit[threadInput.ThreadNumber] = TRUE;
+	printf("start while exit seq\n");
+	while (can_I_delete_file % 2 != 0 && opponentQuit[1 - threadInput.ThreadNumber] == FALSE);
+	printf("finished while exit seq\n");
 	free(other_player);
 ExitFreeServerClientPlayer:
 	free(current_player);
@@ -344,6 +329,10 @@ ExitFreeServerClientPlayer:
 	while (exit_code != SHUTDOWN)
 	{
 		exit_code = Recv_Socket(s_communication, client_response, FIFTEEN_SEC);
+		if (exit_code != 0)
+		{
+			break;
+		}
 	}
 ExitFreeServerClient:
 	free(client_response);

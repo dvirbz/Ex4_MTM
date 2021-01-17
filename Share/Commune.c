@@ -365,7 +365,6 @@ int ReceiveBuffer(SOCKET sd, char* OutputBuffer, int BytesToReceive, int max_wai
 		BytesJustTransferred = recv(sd, CurPlacePtr, 1, 0);
 		if (BytesJustTransferred == SOCKET_ERROR)
 		{
-			printf("recv() failed, error %d\n", WSAGetLastError());
 			return -1;
 		}
 		else if (BytesJustTransferred == 0)
