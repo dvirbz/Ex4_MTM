@@ -63,8 +63,6 @@ BnC_Data* GET__BnC_Data(char* protocol);
 
 /*Send and recive on socket*/
 int Send_Socket(SOCKET s, const char* buffer, int len, int max_wait_time);
-int ReceiveBuffer(SOCKET sd, char* OutputBuffer, int BytesToReceive, int max_wait_time);
-int SendBuffer(SOCKET sd, const char* Buffer, int BytesToSend, int max_wait_time);
-int Recv_Socket(SOCKET s, char* buffer, int max_wait_time);
+int Recv_Socket(SOCKET sd, char* OutputBuffer, int max_wait_time);
 
 #endif // ! COMMUNE_H

@@ -1,38 +1,24 @@
 #include "Player.h"
 
-void print_player(Player* player)
-{
-	printf("player name is: %s\n", player->username);
-	printf("player setup is: %s\n", player->setup);
-	printf("player move is: %s\n", player->move);
-	printf("player line size: %d\n", player->line_size);
-	printf("player is the first player? %d\n", player->is_first_player);
-	printf("player bulls: %d\n", player->bulls);
-	printf("player cows: %d\n", player->cows);
-}
-
 int init_player(Player* player)
 {
-	printf("initializing player...\n");
-	if (snprintf(player->setup, NUM_DIGITIS_GUESS, "aaaa") == 0)
+	if (snprintf(player->setup, NUM_DIGITIS_GUESS, "set!") == 0)
 	{
-		return -1;
+		return ERROR_CODE;
 	}
-	if (snprintf(player->move, NUM_DIGITIS_GUESS, "aaaa") == 0)
+	if (snprintf(player->move, NUM_DIGITIS_GUESS, "mov!") == 0)
 	{
-		return -1;
+		return ERROR_CODE;
 	}
-	if (snprintf(player->username, MAX_USERNAME_LEN, "!!!!!!!!!!!!!!!!!!!!") == 0)
+	if (snprintf(player->username, MAX_USERNAME_LEN, "UsernameInitilize!!!") == 0)
 	{
-		return -1;
+		return ERROR_CODE;
 	}
 	player->line_size = strlen(player->username) + strlen(player->move) +
 		3 * strlen(PARTITION_MASSAGE_PARAMETERS) + 2 * strlen(END_PROTOCOL) + BULLS_AND_COWS_STR_LEN;
 	player->is_first_player = FALSE;
 	player->bulls = 5;
 	player->cows = 5;
-	printf("usernameinit: %s\n", player->username);
-	printf("succses!\n");
 	return 0;
 }
 int init_playeres(Player* current_player, Player* other_player)
