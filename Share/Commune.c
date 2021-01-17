@@ -231,10 +231,13 @@ BnC_Data* GET__BnC_Data(char* protocol)
 	char* temp = (char*)calloc(MAX_PRO_LEN, sizeof(char));
 	if (temp == NULL)
 	{
+		free(data);
 		return NULL;
 	}
 	if (snprintf(temp, MAX_PRO_LEN, "%s", protocol) == 0)
 	{
+		free(data);
+		free(temp);
 		return NULL;
 	}
 	char* next = NULL;
@@ -249,6 +252,8 @@ BnC_Data* GET__BnC_Data(char* protocol)
 		{
 			if (token1 == NULL)
 			{
+				free(data);
+				free(temp);
 				return NULL;
 			}
 			from_which_protocol = SERVER_INVITE_ID;
@@ -320,7 +325,7 @@ BnC_Data* GET__BnC_Data(char* protocol)
 	return data;
 }
 
-int SendBuffer(SOCKET sd, const char* Buffer, int BytesToSend, int max_wait_time)
+int Send_Socket(SOCKET sd, const char* Buffer, int BytesToSend, int max_wait_time)
 {
 	const char* CurPlacePtr = Buffer;
 	int BytesTransferred;
@@ -339,21 +344,16 @@ int SendBuffer(SOCKET sd, const char* Buffer, int BytesToSend, int max_wait_time
 			printf("send() failed, error %d\n", WSAGetLastError());
 			return ERROR_CODE;
 		}
-		printf("Number of bytes send: %d out of total %d\n", BytesTransferred, BytesToSend);
 		RemainingBytesToSend -= BytesTransferred;
 		CurPlacePtr += BytesTransferred;
 	}
 	return 0;
 }
-int Send_Socket(SOCKET s, const char* buffer, int len, int max_wait_time)
-{
-	return SendBuffer(s, buffer, len,max_wait_time);//?+1 for terminating zero
-}
-int ReceiveBuffer(SOCKET sd, char* OutputBuffer, int BytesToReceive, int max_wait_time)
+int Recv_Socket(SOCKET sd, char* OutputBuffer, int max_wait_time)
 {
 	char* CurPlacePtr = OutputBuffer;
 	int BytesJustTransferred;
-	int RemainingBytesToReceive = BytesToReceive;
+	int RemainingBytesToReceive = MAX_PRO_LEN;
 	if (setsockopt(sd, SOL_SOCKET, SO_RCVTIMEO, (char*)&max_wait_time, sizeof(max_wait_time)) == SOCKET_ERROR)
 	{
 		printf("Couldn't set socket recv time out, Last error: %d", GetLastError());
@@ -365,7 +365,7 @@ int ReceiveBuffer(SOCKET sd, char* OutputBuffer, int BytesToReceive, int max_wai
 		BytesJustTransferred = recv(sd, CurPlacePtr, 1, 0);
 		if (BytesJustTransferred == SOCKET_ERROR)
 		{
-			return -1;
+			return ERROR_CODE;
 		}
 		else if (BytesJustTransferred == 0)
 		{
@@ -375,15 +375,10 @@ int ReceiveBuffer(SOCKET sd, char* OutputBuffer, int BytesToReceive, int max_wai
 		if (*CurPlacePtr == '\n')
 		{
 			*CurPlacePtr = '\0';
-			printf("Remaining of 100 : %d\n", RemainingBytesToReceive);
 			break;
 		}
 		CurPlacePtr += BytesJustTransferred; // <ISP> pointer arithmetic
 	}
 
 	return 0;
-}
-int Recv_Socket(SOCKET s, char* buffer, int max_wait_time)
-{
-	return ReceiveBuffer(s, buffer, MAX_PRO_LEN,max_wait_time);
 }

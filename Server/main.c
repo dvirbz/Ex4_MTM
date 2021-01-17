@@ -64,7 +64,6 @@ void CleanupWorkerThreads()
 			}
 			else
 			{
-				printf("Waiting for thread failed. Ending program\n");
 				return;
 			}
 		}
@@ -98,10 +97,9 @@ int FindFirstUnusedThreadSlot()
 			break;
 		else
 		{
-			// poll to check if thread finished running:
 			DWORD Res = WaitForSingleObject(ThreadHandles[Ind], 0);
 
-			if (Res == WAIT_OBJECT_0) // this thread finished running
+			if (Res == WAIT_OBJECT_0) 
 			{
 				CloseHandle(ThreadHandles[Ind]);
 				ThreadHandles[Ind] = NULL;
@@ -123,10 +121,8 @@ int Game(SOCKET s_communication, char* client_response, char* server_massage, Pl
 		{
 			if (send_opponent_quit(s_communication, server_massage) == ERROR_CODE)
 			{
-				printf("can't send opponent quit\n");
 				return ERROR_CODE;
 			}
-			printf("sent opponent quit.\n");
 			return SERVER_OPPONENT_QUIT_ID;
 		}
 		int exit_code = 0;
@@ -134,14 +130,12 @@ int Game(SOCKET s_communication, char* client_response, char* server_massage, Pl
 			current_player, other_player, gameSession, file_lock, threadNumber);
 		if(exit_code != 0)
 		{
-			printf("can't handle move\n");
 			return exit_code;
 		}
 		/* check for BnC, send to client*/
 		BnC_Data* data = GET__Bulls_And_Cows(current_player->setup, other_player->move);
 		if (data == NULL)
 		{
-			printf("can't handle data\n");
 			return ERROR_CODE;
 		}
 		other_player->bulls = data->bulls;
@@ -160,23 +154,19 @@ int Game(SOCKET s_communication, char* client_response, char* server_massage, Pl
 		{
 		case CURRENT_WON:
 			send_game_won(s_communication, server_massage, other_player, current_player);
-			printf("I Won\n");
 			play_status = -1;
 			break;
 		case OTHER_WON:
 			send_game_won(s_communication, server_massage, other_player, other_player);
-			printf("Other Won\n");
 			play_status = -1;
 			break;
 		case DRAW:
 			send_game_draw(s_communication, server_massage, other_player, current_player);
-			printf("It's a tie\n");
 			play_status = -1;
 			break;
 		case CONTINUE:
 			if (send_game_results(s_communication, server_massage, other_player, current_player) != 0)
 			{
-				printf("can't send game results\n");
 				return ERROR_CODE;
 			}
 			break;		
@@ -305,23 +295,19 @@ DWORD WINAPI StartThread(LPVOID lp_params)
 		}
 		if (exit_code == SERVER_OPPONENT_QUIT_ID)
 		{
-			printf("got into server opponent quit id");
 			exit_code = 0;
 			goto MainMenu;
 		}
 	}
 
-ExitSeq:
-	printf("entered ExitSeq\n");	
+ExitSeq:	
 	if (gameSession != NULL)
 	{
 		CloseHandle(gameSession);		
 		can_I_delete_file++;
 	}	
 	opponentQuit[threadInput.ThreadNumber] = TRUE;
-	printf("start while exit seq\n");
 	while (can_I_delete_file % 2 != 0 && opponentQuit[1 - threadInput.ThreadNumber] == FALSE);
-	printf("finished while exit seq\n");
 	free(other_player);
 ExitFreeServerClientPlayer:
 	free(current_player);
@@ -343,7 +329,6 @@ Exit_No_Free:
 	{
 		printf("Failed to close MainSocketThread, error %ld. Ending program\n", WSAGetLastError());
 	}
-	printf("player quit\n");
 	return exit_code;
 }
 
@@ -392,14 +377,10 @@ Exit_No_Free:
 
 DWORD WINAPI ExitMainThread(char* exit_string)
 {
-	printf("Start checking for exit\n");
 	while (strcmp(exit_string, "exit") != 0)
 	{
-		printf("%s\n", exit_string);
 		scanf_s("%s", exit_string, EXIT_STRING_LEN);
-		printf("%s\n", exit_string);
 	}
-	printf("End checking for exit\n");
 	return 0;
 }
 
@@ -415,38 +396,36 @@ int main(int argc, char* argv[])
 	Lock* file_lock = New__Lock(NUM_OF_THREADS);
 	if (file_lock == NULL)
 	{
-		return -1;
+		return ERROR_CODE;
 	}
 	readAndWriteEvent = CreateEvent(
-		NULL,               // default security attributes
-		TRUE,               // manual-reset event
-		FALSE,              // initial state is nonsignaled
-		TEXT("WriteEvent")  // object name
+		NULL,               
+		TRUE,               
+		FALSE,              
+		TEXT("WriteEvent")  
 	);
 	first_want_to_invite = CreateEvent(
-		NULL,               // default security attributes
-		TRUE,               // manual-reset event
-		FALSE,              // initial state is nonsignaled
-		TEXT("FirstInvite")  // object name
+		NULL,               
+		TRUE,               
+		FALSE,              
+		TEXT("FirstInvite")  
 	);
 	second_want_to_invite = CreateEvent(
-		NULL,               // default security attributes
-		TRUE,               // manual-reset event
-		FALSE,              // initial state is nonsignaled
-		TEXT("SecondInvite")  // object name
+		NULL,               
+		TRUE,               
+		FALSE,              
+		TEXT("SecondInvite")  
 	);
 	if (readAndWriteEvent == NULL || first_want_to_invite == NULL || second_want_to_invite == NULL)
 	{
-		printf("couldn't create event");
-		return -1;
+		return ERROR_CODE;
 	}
 	portNumber = (int)strtol(argv[PORT_NUMBER_INDEX], NULL, DECIMAL_BASE);
 	if (portNumber == 0)
 	{
 		Destroy__lock(file_lock);
-		return -1;
+		return ERROR_CODE;
 	}
-	printf("your port number is: %d\n", portNumber);
 	assert(InitializeWSA() == 0);
 	s_server = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
 	if (s_server == INVALID_SOCKET)
@@ -503,7 +482,6 @@ int main(int argc, char* argv[])
 		exit_code = ERROR_CODE;
 		goto CloseSocket;
 	}
-	printf("Waiting for a client to connect...\n");
 	DWORD exit_retval = WaitForSingleObject(thread_exit, 0);
 	TIMEVAL wait_time;
 	wait_time.tv_sec = 1;
@@ -517,7 +495,7 @@ int main(int argc, char* argv[])
 
 		if ((activity < 0) && (errno != EINTR))
 		{
-			printf("select error");
+			printf("select failed\n");
 		}
 		if (activity > 0)
 		{
@@ -531,12 +509,10 @@ int main(int argc, char* argv[])
 					exit_code = -1;
 					goto CloseSocket;
 				}
-				printf("Client Connected.\n");
 				Ind = FindFirstUnusedThreadSlot();
 
 				if (Ind == NUM_OF_THREADS) //two players already play
 				{
-					printf("No slots available for client, dropping the connection.\n");
 					ServerDeniedThreadInputs.ClientSocket = AcceptSocket;
 					ThreadToBeClosed = CreateThread(NULL,
 						0,
@@ -569,7 +545,7 @@ int main(int argc, char* argv[])
 		}
 
 	}
-	printf("end");
+
 	CleanupWorkerThreads();
 CloseSocket:
 	if (closesocket(s_server) == SOCKET_ERROR)

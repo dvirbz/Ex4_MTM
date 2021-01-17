@@ -4,16 +4,14 @@ FILE_FUNC_H BOOL opponentQuit[NUM_OF_THREADS] = { TRUE, TRUE };
 /*Write the player data line to the appropriate line in the file */
 int write_to_file(HANDLE gameSession, Player* current_player, Player* other_player, Lock* file_lock)
 {
-	if (Write__Lock__Mutex(file_lock, 5000) == FALSE)
+	if (Write__Lock__Mutex(file_lock, WRITE_TO_FILE_TIME) == FALSE)
 	{
-		printf("write lock mutex\n");
-		return -1;
+		return ERROR_CODE;
 	}
-	if (Write__Lock(file_lock, 5000, NUM_OF_THREADS) == FALSE)
+	if (Write__Lock(file_lock, WRITE_TO_FILE_TIME, NUM_OF_THREADS) == FALSE)
 	{
 		Write__Release__Mutex(file_lock);
-		printf("write lock\n");
-		return -1;
+		return ERROR_CODE;
 	}
 	int distance_to_move = 0;
 	if (current_player->is_first_player == FALSE)
@@ -24,8 +22,7 @@ int write_to_file(HANDLE gameSession, Player* current_player, Player* other_play
 	{
 		Write__Release(file_lock, NUM_OF_THREADS);
 		Write__Release__Mutex(file_lock);
-		printf("couldn't set file pointer, error: %d\n", GetLastError());
-		return -1;
+		return ERROR_CODE;
 	}
 	char line_to_write[MAX_LINE_LEN];
 	int character_count = snprintf(line_to_write, MAX_LINE_LEN, "%s:%s:%d:%d\r\n",
@@ -34,27 +31,24 @@ int write_to_file(HANDLE gameSession, Player* current_player, Player* other_play
 	{
 		Write__Release(file_lock, NUM_OF_THREADS);
 		Write__Release__Mutex(file_lock);
-		printf("couldn't write string\n");
-		return -1;
+		return ERROR_CODE;
 	}
 	if (WriteFile(gameSession, line_to_write, strlen(line_to_write), NULL, NULL) == 0)
 	{
 		Write__Release(file_lock, NUM_OF_THREADS);
 		Write__Release__Mutex(file_lock);
 		printf("failed to write to file\n");
-		return -1;
+		return ERROR_CODE;
 	}
 	num_of_writing++;
 	if (Write__Release(file_lock, NUM_OF_THREADS) == FALSE)
 	{
 		Write__Release__Mutex(file_lock);
-		printf("write release\n");
-		return -1;
+		return ERROR_CODE;
 	}
 	if (Write__Release__Mutex(file_lock) == FALSE)
 	{
-		printf("write release mutex\n");
-		return -1;
+		return ERROR_CODE;
 	}
 
 	return 0;
@@ -63,10 +57,9 @@ int write_to_file(HANDLE gameSession, Player* current_player, Player* other_play
 int read__line(HANDLE gameSession, Player* current_player, Player* other_player, Lock* file_lock, int threadNumber)
 {
 	while ((num_of_writing % 2) != 0 && opponentQuit[1 - threadNumber] == FALSE);
-	if (Read__Lock(file_lock, 5000) == FALSE)
+	if (Read__Lock(file_lock, WRITE_TO_FILE_TIME) == FALSE)
 	{
-		printf("Could't lock in 5 sec\n");
-		return -1;
+		return ERROR_CODE;
 	}
 	int distance_to_move = current_player->line_size;
 	if (current_player->is_first_player == FALSE)
@@ -75,27 +68,22 @@ int read__line(HANDLE gameSession, Player* current_player, Player* other_player,
 	}
 	if (SetFilePointer(gameSession, distance_to_move, NULL, FILE_BEGIN) == INVALID_SET_FILE_POINTER)
 	{
-		printf("couldn't set file pointer\n");
-		return -1;
+		return ERROR_CODE;
 	}
 	char line[MAX_LINE_LEN];
 	if (ReadFile(gameSession, line, other_player->line_size, NULL, NULL) == 0)
 	{
-		printf("couldn't read file\n");
-		return -1;
+		return ERROR_CODE;
 	}
 	line[other_player->line_size] = '\0';
 	if (Read__Release(file_lock) == FALSE)
 	{
-		printf("couldn't release\n");
-		return -1;
+		return ERROR_CODE;
 	}
 	if (update_data_from_file(other_player, current_player, line) == -1)
 	{
-		printf("couldn't update_player\n");
-		return -1;
+		return ERROR_CODE;
 	}
-	printf("User: %s other user: %s line: %s\n", current_player->username, other_player->username, line);
 	return 0;
 }
 
@@ -104,13 +92,13 @@ int write_and_read(HANDLE gameSession, Player* current_player, Player* other_pla
 	if (write_to_file(gameSession, current_player, other_player, file_lock) == -1)
 	{
 		printf("can't write to file\n");
-		return -1;
+		return ERROR_CODE;
 	}
 
 	if (read__line(gameSession, current_player, other_player, file_lock, threadNumber) == -1)
 	{
 		printf("can't read from file\n");
-		return -1;
+		return ERROR_CODE;
 	}
 	return 0;
 }
@@ -123,37 +111,29 @@ int update_data_from_file(Player* other_player, Player* current_player, char* pl
 	move = strtok_s(NULL, ":\r", &next);
 	bulls = strtok_s(NULL, ":\r", &next);
 	cows = strtok_s(NULL, ":\r", &next);
-	printf("Before Line size: %d\n", other_player->line_size);
-	printf("username: %s\nmove: %s\nBulls: %s\nCows: %s\n", username, move, bulls, cows);
 	if (username == NULL || move == NULL || bulls == NULL || cows == NULL)
 	{
-		printf("username or moveset == NULL\n");
-		return -1;
+		return ERROR_CODE;
 	}
 	if (snprintf(other_player->username, MAX_USERNAME_LEN, "%s", username) == 0)
 	{
-		printf("snprintf failed 3\n");
-		return -1;
+		return ERROR_CODE;
 	}
 	if (snprintf(other_player->move, NUM_DIGITIS_GUESS, "%s", move) == 0)
 	{
-		printf("snprintf failed 3\n");
-		return -1;
+		return ERROR_CODE;
 	}
 	current_player->bulls = (int)strtol(bulls, NULL, DECIMAL_BASE);
 	if (current_player->bulls == 0 && bulls[0] != '0')
 	{
-		printf("strtol failed bulls: %s\n", bulls);
-		return -1;
+		return ERROR_CODE;
 	}
 	current_player->cows = (int)strtol(cows, NULL, DECIMAL_BASE);
 	if (current_player->cows == 0 && cows[0] != '0')
 	{
-		printf("strtol failed cows: %s\n", cows);
-		return -1;
+		return ERROR_CODE;
 	}
 	other_player->line_size = strlen(username) + strlen(move) + strlen(bulls)
 		+ strlen(cows) + strlen(PARTITION_MASSAGE_PARAMETERS) * 3 + 2 * strlen(END_PROTOCOL);
-	printf("After Line size: %d\n", other_player->line_size);
 	return 0;
 }
